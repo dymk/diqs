@@ -1,6 +1,8 @@
 module diqs;
 
 import haar;
+import magick_wand;
+
 import std.stdio;
 
 void main()
