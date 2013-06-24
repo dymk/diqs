@@ -2,6 +2,7 @@ module diqs;
 
 import haar;
 import magick_wand;
+import consts;
 
 import std.stdio;
 
