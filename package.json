@@ -1,0 +1,10 @@
+{
+	"name": "diqs",
+	"description": "D Image Query Server",
+	"copyright": "Copyright © 2013, Dylan Knutson",
+	"authors": [
+		"Dylan Knutson"
+	],
+	"dependencies": {
+	}
+}
