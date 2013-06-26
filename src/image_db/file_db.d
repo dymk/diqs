@@ -10,6 +10,8 @@ import std.typecons : Tuple;
 import types : image_id_t, ImageData, IDImageData;
 import image_db : BaseDB;
 
+import dcollections.HashMap : HashMap;
+
 /**
  * Database structure:
  * where N is the number of images in the database
@@ -20,9 +22,12 @@ import image_db : BaseDB;
 
 class FileDB : BaseDB
 {
+	alias IdMap = HashMap!(image_id_t, image_id_t);
+
 	/// Loads the database from the file in db_path
 	this(string db_path)
 	{
+		m_user_internal_ids = new IdMap;
 		m_db_path = db_path;
 	}
 
@@ -57,8 +62,11 @@ class FileDB : BaseDB
 	}
 
 private:
-	// path to the database file this is bound to
+	// Path to the database file this is bound to
 	string m_db_path;
+
+	// Maps a user_id to an internally used ID
+	 IdMap m_user_internal_ids;
 
 	// The next highest user facing ID in the database (highest found + 1)
 	image_id_t m_next_user_id = 0;
