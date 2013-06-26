@@ -7,8 +7,8 @@ import std.algorithm;
 import std.traits;
 import std.math;
 
-double[][] haar2d(T)(const T[][] in_mat) @safe pure nothrow
-if(is(T : double))
+float[][] haar2d(T)(const T[][] in_mat) @safe pure nothrow
+if(is(T : float))
 in
 {
 	assert(in_mat.length);
@@ -19,7 +19,7 @@ body
 {
 	auto in_mat_rows = in_mat.length,
 	     in_mat_cols = in_mat.front.length;
-	auto out_mat     = new double[][in_mat_rows];
+	auto out_mat     = new float[][in_mat_rows];
 
 	// Verify the matrix isn't jagged
 	foreach(ref row; in_mat) {
@@ -32,7 +32,7 @@ body
 	}
 
 	// And now on each column
-	scope temp_row = new double[in_mat_rows];
+	scope temp_row = new float[in_mat_rows];
 	foreach(x; 0..in_mat_cols) {
 		foreach(y; 0..in_mat_rows) {
 			temp_row[y] = out_mat[y][x];
@@ -70,12 +70,12 @@ unittest {
 	}
 }
 
-double[] haar1d(T)(const T[] in_vec) @safe pure nothrow
-if(is(T : double))
+float[] haar1d(T)(const T[] in_vec) @safe pure nothrow
+if(is(T : float))
 {
 	auto in_vec_len      = in_vec.length;
-	auto  out_vec        = new double[in_vec_len];
-	scope temp_vec       = new double[in_vec_len];
+	auto  out_vec        = new float[in_vec_len];
+	scope temp_vec       = new float[in_vec_len];
 	foreach(i, val; in_vec) {
 		out_vec[i] = val;
 	}

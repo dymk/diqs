@@ -3,7 +3,7 @@ module consts;
  * Module Consts: Configuration constatants for DIQS.
  */
 
-import std.algorithm : min, max;
+import util : min, max;
 
 /// Image constants
 enum ImageHeight = 10;
@@ -40,11 +40,11 @@ shared float[3][6][2] Weights = [
 
 /// Maps coefficient location to a weight bucket
 /// Initialized with a self executing lambda, a-la Javascript
-shared byte[ImageArea] WeightBins = (() {
-	byte[ImageArea] tmp;
+shared ubyte[ImageArea] WeightBins = (() {
+	ubyte[ImageArea] tmp;
 	foreach(i; 0..ImageHeight) {
 		foreach(j; 0..ImageWidth) {
-			tmp[(i * ImageHeight) + j] = min(max(i, j), 5);
+			tmp[(i * ImageHeight) + j] = cast(ubyte) min(max(i, j), 5);
 		}
 	}
 	return tmp;
