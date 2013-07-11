@@ -58,6 +58,7 @@ if(is(T : float))
 	}
 }
 
+/* Test haar2d on a matrix */
 unittest {
 	auto in_mat = [
 		[5.0f, 6.0f, 1.0f, 2.0f],
@@ -65,7 +66,7 @@ unittest {
 		[3.0f, 1.0f, 7.0f, 1.0f],
 		[6.0f, 3.0f, 5.0f, 1.0f]
 	 ].dup;
-	auto expected_vec = [
+	auto expected_mat = [
 	  [14.25f,        0.75f,        2.12132034f,  3.18198052f],
 	  [ 0.75f,        1.25f,       -1.41421356f, -3.8890873f],
 	  [-0.70710678f,  4.24264069f, -1.5f,        -0.5f],
@@ -75,8 +76,29 @@ unittest {
 	haar2d(in_mat);
 	foreach(y, row; in_mat) {
 		foreach(x, value; row) {
-			assert(value.approxEqual(expected_vec[y][x]));
+			assert(value.approxEqual(expected_mat[y][x]));
 		}
+	}
+}
+
+/* Test haar2d on a vector with explicit dimentions */
+unittest {
+	auto in_vec = [
+		5.0f, 6.0f, 1.0f, 2.0f,
+		4.0f, 2.0f, 5.0f, 5.0f,
+		3.0f, 1.0f, 7.0f, 1.0f,
+		6.0f, 3.0f, 5.0f, 1.0f
+	 ].dup;
+	auto expected_vec = [
+	  14.25f,        0.75f,        2.12132034f,  3.18198052f,
+	   0.75f,        1.25f,       -1.41421356f, -3.8890873f,
+	  -0.70710678f,  4.24264069f, -1.5f,        -0.5f,
+	  -1.06066017f, -2.47487373f, -0.5f,         1.0f
+	];
+
+	haar2d(in_vec, 4, 4);
+	foreach(i, value; in_vec) {
+		assert(value.approxEqual(expected_vec[i]));
 	}
 }
 

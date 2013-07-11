@@ -6,9 +6,10 @@ module consts;
 import util : min, max;
 
 /// Image constants
-enum ImageHeight = 10;
-enum ImageWidth  = 10;
-enum ImageArea   = ImageHeight * ImageWidth;
+enum short ImageHeight   = 128;
+enum short ImageWidth    = 128;
+enum short ImageArea     = ImageHeight * ImageWidth;
+enum ubyte NumColorChans = 3;
 
 /// Signature configuration
 /// The number of coefficients that a signature represents
