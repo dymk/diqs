@@ -237,5 +237,7 @@
    <File path="src\types.d" />
    <File path="src\util.d" />
   </Folder>
+  <File path=".gitignore" />
+  <File path="package.json" />
  </Folder>
 </DProject>
