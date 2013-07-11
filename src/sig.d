@@ -96,9 +96,9 @@ struct ImageData
 
 		ret.dc = ImageDC(ychan[0], ichan[0], qchan[0]);
 
-		scope ylargest = largestCoeffs(ychan[1..$], NumSigCoeffs);
-		scope ilargest = largestCoeffs(ichan[1..$], NumSigCoeffs);
-		scope qlargest = largestCoeffs(qchan[1..$], NumSigCoeffs);
+		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs);
+		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs);
+		scope qlargest = largestCoeffs(qchan[], NumSigCoeffs);
 
 		auto sig = ImageSig();
 		ylargest.map!(a => a.index)().copy(sig.y[]);

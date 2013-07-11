@@ -24,8 +24,10 @@ T max(T)(T a, T b)
 CoeffIPair[] largestCoeffs(C)(C[] coeffs, int n)
 if(is(C : coeff_t))
 {
-	short i = 0;
-	scope coeff_set = coeffs.map!(a => CoeffIPair(i++, a))().array();
+	// Start at coeffs == 1 because the 0 coeff is a DC componenet, and
+	// not used in the signature
+	short i = 1;
+	scope coeff_set = coeffs[i..$].map!(a => CoeffIPair(i++, a))().array();
 	sort!("std.math.abs(a.coeff) > std.math.abs(b.coeff)")(coeff_set);
 	return coeff_set[0..n].array(); //.array because coeff_set is scope
 }

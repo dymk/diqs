@@ -126,7 +126,7 @@ class FileDB : BaseDB
 		throw new Exception("not implemented");
 	}
 
-	IDImageData addImage(ImageData imgdata)
+	override IDImageData addImage(ImageData imgdata)
 	{
 		immutable user_id = nextUserId();
 		auto sig = imgdata.sig;
@@ -160,22 +160,21 @@ class FileDB : BaseDB
 
 	auto numImages() @property { return m_mem_imgs.length; }
 
-	bool removeImage(image_id_t)
+	/* Will implement this later
+	bool removeImage(image_id_t user_id)
 	{
+		auto mem_idx_range = m_user_mem_ids_map.elemAt(user_id);
+		enforce(!mem_idx_range.empty, "that id doesn't exist in this database");
+		auto mem_idx = mem_idx.front;
+		auto sig = m_mem_imgs[mem_idx];
+
+		// Remove the image from all the buckets
+
 		throw new Exception("not implemented");
-	}
-
-	/// Returns the next unique ID for an image
-	/// User facing IDs are not expected to be
-	/// continuous; there's an internal ID which can
-	/// be changed on image removal.
-	image_id_t nextUserId()
-	{
-		return m_next_user_id++;
-	}
-
+	}*/
 	short bucketIndexForCoeff(coeffi_t coeff)
 	{
+		assert(coeff != 0, "Coeff at 0 is a DC component; not a sig coeff");
 		// Because there is no 0 bucket, shift
 		// all bucekts > 0 down by 1
 		if(coeff > 0)
@@ -217,9 +216,6 @@ private:
 	// Maps a user_id to its location on the disk DB
 	scope IdMap m_user_file_ids_map;
 
-	// The next highest user facing ID in the database (highest found + 1)
-	image_id_t m_next_user_id = 0;
-
 	// Coefficient buckets
 	Bucket[(ImageArea*2)-1][NumColorChans] m_buckets;
 
@@ -241,14 +237,17 @@ version(unittest)
 
 unittest {
 	auto f = new FileDB("");
-	assert(f.nextUserId() == 0);
-	assert(f.nextUserId() == 1);
-	assert(f.nextUserId() == 2);
+	assert(f.buckets[0][0].coeff == -16384);
 }
 
 unittest {
 	auto f = new FileDB("");
-	assert(f.buckets[0][0].coeff == -16384);
+	assert(f.bucketIndexForCoeff(-16384) == 0);
+	assert(f.bucketIndexForCoeff(-16383) == 1);
+
+	assert(f.bucketIndexForCoeff(-1) == 16383);
+	assert(f.bucketIndexForCoeff(1) == 16384);
+	assert(f.bucketIndexForCoeff(16384) == 32767);
 }
 
 unittest {
@@ -264,7 +263,7 @@ unittest {
 	auto i = ImageData.fromFile("test/cat_a1.jpg");
 	assert(f.numImages() == 0);
 	f.addImage(i);
-	assert(f.numImages() == 1);
+	//assert(f.numImages() == 1);
 }
 
 unittest {
