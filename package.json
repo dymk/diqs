@@ -19,5 +19,7 @@
 	],
 
 	"dependencies": {
-	}
+	},
+
+	"libs-linux": ["MagickWand", "MagickCore"]
 }
