@@ -83,7 +83,7 @@ struct Hash(V, alias hashFunction, alias updateFunction, float loadFactor=HashDe
     {
         Hash *owner;
         Node ptr;
-        int idx;
+        size_t idx;
 
         /**
          * Returns the position that comes after p.
