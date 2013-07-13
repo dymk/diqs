@@ -21,7 +21,7 @@ import types :
 	sig_t,
 	dc_t,
 	res_t,
-	image_id_t;
+	user_id_t;
 
 import haar : haar2d;
 import util : largestCoeffs;
@@ -121,7 +121,7 @@ unittest {
 /// so an immutable user ID can be associated with it
 struct IDImageData
 {
-	image_id_t user_id;
+	user_id_t user_id;
 	ImageSig sig;
 	ImageDC dc;
 	ImageRes res;

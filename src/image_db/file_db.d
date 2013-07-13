@@ -9,7 +9,8 @@ import std.typecons : Tuple;
 import std.exception : enforce;
 
 import types :
-	image_id_t,
+	user_id_t,
+	intern_id_t,
 	coeffi_t,
 	chan_t;
 
@@ -34,11 +35,11 @@ import dcollections.HashMap : HashMap;
 
 class FileDB : BaseDB
 {
-	alias IdMap = HashMap!(image_id_t, image_id_t);
+	alias UserInternMap = HashMap!(user_id_t, intern_id_t);
 
 	struct IDImageSansSig
 	{
-		image_id_t user_id;
+		user_id_t user_id;
 		ImageDC dc;
 		ImageRes res;
 	}
@@ -56,7 +57,7 @@ class FileDB : BaseDB
 		coeffi_t coeff;
 
 		// Push an ID into the bucket
-		size_t push(image_id_t id)
+		size_t push(user_id_t id)
 		{
 			enforce(!has(id));
 			m_mem_ids ~= id;
@@ -65,20 +66,13 @@ class FileDB : BaseDB
 		}
 
 		// Test if the bucket contains that ID
-		bool has(image_id_t id)
+		bool has(user_id_t id)
 		{
 			return m_sorted_mem_ids.contains(id);
 		}
 
-		// Shorthand for remove and push
-		void move(image_id_t from, image_id_t to)
-		{
-			remove(from);
-			push(to);
-		}
-
 		// Remove an ID from the bucket
-		bool remove(image_id_t id)
+		bool remove(user_id_t id)
 		{
 			// Get the position of the ID
 			auto pos = m_sorted_mem_ids.countUntil(id);
@@ -93,15 +87,15 @@ class FileDB : BaseDB
 		auto length() @property { return m_mem_ids.length; }
 
 	private:
-		image_id_t[] m_mem_ids;
-		SortedRange!(image_id_t[]) m_sorted_mem_ids;
+		user_id_t[] m_mem_ids;
+		SortedRange!(user_id_t[]) m_sorted_mem_ids;
 	}
 
 	/// Loads the database from the file in db_path
 	this(string db_path)
 	{
-		m_user_mem_ids_map = new IdMap;
-		m_user_file_ids_map = new IdMap;
+		m_user_mem_ids_map = new UserInternMap;
+		m_user_file_ids_map = new UserInternMap;
 
 		m_db_path = db_path;
 
@@ -128,7 +122,7 @@ class FileDB : BaseDB
 
 	override IDImageData addImage(ImageData imgdata)
 	{
-		immutable user_id = nextUserId();
+		user_id_t user_id = nextUserId();
 		auto sig = imgdata.sig;
 		auto dc = imgdata.dc;
 		auto res = imgdata.res;
@@ -210,11 +204,11 @@ private:
 	scope File m_db_handle;
 
 	// Maps a user_id to its index in m_mem_imgs
-	scope IdMap m_user_mem_ids_map;
+	scope UserInternMap m_user_mem_ids_map;
 	scope IDImageSansSig[] m_mem_imgs;
 
 	// Maps a user_id to its location on the disk DB
-	scope IdMap m_user_file_ids_map;
+	scope UserInternMap m_user_file_ids_map;
 
 	// Coefficient buckets
 	Bucket[(ImageArea*2)-1][NumColorChans] m_buckets;
@@ -223,7 +217,7 @@ private:
 	// so when .save() is called, the in database file can
 	// be synced with the state of the memory database
 	alias ImageAddJob = IDImageData;
-	alias ImageRmJob  = image_id_t;
+	alias ImageRmJob  = user_id_t;
 
 	scope ImageAddJob[] m_add_jobs;
 	scope ImageRmJob[]  m_rm_jobs;
@@ -278,7 +272,7 @@ unittest {
 }
 
 unittest {
-	auto c = new FileDB.IdMap;
+	auto c = new FileDB.UserInternMap;
 	c[50] = 3;
 	c[1] = 2;
 	assert(!c.elemAt(1).empty);

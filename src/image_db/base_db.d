@@ -4,7 +4,7 @@ module image_db.base_db;
  * Represents an image database, held in memory and/or the disk.
  */
 
-import types : image_id_t;
+import types : user_id_t;
 import sig : ImageData, IDImageData;
 
 abstract class BaseDB
@@ -15,14 +15,14 @@ abstract class BaseDB
 	/// User facing IDs are not expected to be
 	/// continuous; there's an internal ID which can
 	/// be changed on image removal.
-	protected image_id_t nextUserId()
+	protected user_id_t nextUserId()
 	{
 		return m_next_user_id++;
 	}
 
 private:
 	// The next highest user facing ID in the database (highest found + 1)
-	image_id_t m_next_user_id = 0;
+	user_id_t m_next_user_id = 0;
 }
 
 version(unittest) {
