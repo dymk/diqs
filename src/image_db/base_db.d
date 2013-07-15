@@ -11,13 +11,36 @@ abstract class BaseDB
 {
 	IDImageData addImage(ImageData);
 
-	/// Returns the next unique ID for an image
-	/// User facing IDs are not expected to be
-	/// continuous; there's an internal ID which can
-	/// be changed on image removal.
+	/**
+	 * Returns the next unique ID for an image. User facing IDs are not expected
+	 * to be continuous; there's an internal ID which can be changed on image
+	 * removal.
+	 */
 	protected user_id_t nextUserId()
 	{
 		return m_next_user_id++;
+	}
+
+	short bucketIndexForCoeff(coeffi_t coeff)
+	{
+		assert(coeff != 0, "Coeff at 0 is a DC component; not a sig coeff");
+		// Because there is no 0 bucket, shift
+		// all bucekts > 0 down by 1
+		if(coeff > 0)
+			coeff--;
+		coeff += ImageArea; // Eg bucket -16384 => 0
+		return coeff;
+	}
+
+	/// Inverse of bucketIndexForCoeff
+	/// Convert a bucket's index to a coefficient
+	/// EG 0 => -16384
+	coeffi_t coeffForBucketIndex(short index)
+	{
+		if(index >= ImageArea)
+			index++;
+		index -= ImageArea;
+		return index;
 	}
 
 private:

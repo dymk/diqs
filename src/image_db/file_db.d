@@ -44,53 +44,6 @@ class FileDB : BaseDB
 		ImageRes res;
 	}
 
-	struct Bucket
-	{
-		import std.algorithm :
-		  stdRemove = remove,
-		  sort,
-		  countUntil,
-		  SortedRange,
-		  SwapStrategy;
-		import std.range : assumeSorted;
-
-		coeffi_t coeff;
-
-		// Push an ID into the bucket
-		size_t push(user_id_t id)
-		{
-			enforce(!has(id));
-			m_mem_ids ~= id;
-			m_sorted_mem_ids = sort(m_mem_ids);
-			return length;
-		}
-
-		// Test if the bucket contains that ID
-		bool has(user_id_t id)
-		{
-			return m_sorted_mem_ids.contains(id);
-		}
-
-		// Remove an ID from the bucket
-		bool remove(user_id_t id)
-		{
-			// Get the position of the ID
-			auto pos = m_sorted_mem_ids.countUntil(id);
-			if(pos == -1)
-				return false;
-			m_mem_ids = m_mem_ids.stdRemove(pos);
-			m_sorted_mem_ids = m_mem_ids.assumeSorted();
-			return true;
-		}
-
-		auto ids() @property    { return m_sorted_mem_ids; }
-		auto length() @property { return m_mem_ids.length; }
-
-	private:
-		user_id_t[] m_mem_ids;
-		SortedRange!(user_id_t[]) m_sorted_mem_ids;
-	}
-
 	/// Loads the database from the file in db_path
 	this(string db_path)
 	{
@@ -166,27 +119,6 @@ class FileDB : BaseDB
 
 		throw new Exception("not implemented");
 	}*/
-	short bucketIndexForCoeff(coeffi_t coeff)
-	{
-		assert(coeff != 0, "Coeff at 0 is a DC component; not a sig coeff");
-		// Because there is no 0 bucket, shift
-		// all bucekts > 0 down by 1
-		if(coeff > 0)
-			coeff--;
-		coeff += ImageArea; // Eg bucket -16384 => 0
-		return coeff;
-	}
-
-	/// Inverse of bucketIndexForCoeff
-	/// Convert a bucket's index to a coefficient
-	/// EG 0 => -16384
-	coeffi_t coeffForBucketIndex(short index)
-	{
-		if(index >= ImageArea)
-			index++;
-		index -= ImageArea;
-		return index;
-	}
 
 	ref Bucket bucketForCoeff(coeffi_t coeff, chan_t chan)
 	{
@@ -278,34 +210,4 @@ unittest {
 	assert(!c.elemAt(1).empty);
 	assert(c.elemAt(1).front == 2);
 	assert(c.elemAt(2).empty);
-}
-
-unittest {
-	auto b = FileDB.Bucket();
-	b.push(1);
-	b.push(2);
-	assert(equal(b.ids, [1, 2]));
-}
-
-unittest {
-	auto b = FileDB.Bucket();
-	b.push(1);
-	b.remove(1);
-	uint[] empty = [];
-	assert(equal(b.ids, empty));
-}
-
-unittest {
-	auto b = FileDB.Bucket();
-	foreach(i; 0..5)
-		b.push(i);
-	b.remove(1);
-	assert(equal(b.ids, [0, 2, 3, 4]));
-}
-
-unittest {
-	auto b = FileDB.Bucket();
-	b.push(1);
-	b.move(1, 2);
-	assert(equal(b.ids, [2]));
 }
