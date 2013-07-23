@@ -6,7 +6,9 @@ module image_db.bucket;
  * existance checking, and removal of user_id_ts.
  */
 
-import types : user_id_t;
+import types :
+  user_id_t,
+  coeffi_t;
 
 import std.algorithm :
   stdAlgoRemove = remove,
@@ -15,6 +17,8 @@ import std.algorithm :
   SortedRange,
   SwapStrategy;
 import std.range : assumeSorted;
+import std.exception : enforce;
+
 
 struct Bucket
 {
@@ -56,7 +60,7 @@ private:
 }
 
 version(unittest) {
-	import std.algorithm.equal;
+	import std.algorithm : equal;
 }
 
 unittest {
@@ -80,11 +84,4 @@ unittest {
 		b.push(i);
 	b.remove(1);
 	assert(equal(b.ids, [0, 2, 3, 4]));
-}
-
-unittest {
-	auto b = Bucket();
-	b.push(1);
-	b.move(1, 2);
-	assert(equal(b.ids, [2]));
 }

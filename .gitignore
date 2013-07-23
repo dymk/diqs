@@ -1,6 +1,8 @@
 *.exe
 *.txt
 *.obj
+*.suo
+*.user
 
 *.sublime-project
 *.sublime-workspace

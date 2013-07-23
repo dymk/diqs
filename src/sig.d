@@ -73,6 +73,17 @@ struct ImageData
 	ImageRes res;
 
 	static auto fromFile(string file)
+	out(ret)
+	{
+		import std.algorithm : filter;
+		import std.string;
+		// Assert there are no 0 coefficients in the sig
+		foreach(sig_t s; ret.sig.sigs) {
+			assert(filter!(a => a == 0)(s[]).array().length == 0,
+				format("0 coeff found: %s", s[]));
+		}
+	}
+	body
 	{
 		auto ret = ImageData();
 		scope wand = new MagickWand();
@@ -96,11 +107,13 @@ struct ImageData
 
 		ret.dc = ImageDC(ychan[0], ichan[0], qchan[0]);
 
-		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs);
-		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs);
-		scope qlargest = largestCoeffs(qchan[], NumSigCoeffs);
+		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs, 1);
+		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs, 1);
+		scope qlargest = largestCoeffs(qchan[], NumSigCoeffs, 1);
 
 		auto sig = ImageSig();
+		// Add 1 to all of the indexes, because largestCoeff was passed the tail of
+		// the channel, so all coeffs' indexes were shifted left.
 		ylargest.map!(a => a.index)().copy(sig.y[]);
 		ilargest.map!(a => a.index)().copy(sig.i[]);
 		qlargest.map!(a => a.index)().copy(sig.q[]);
@@ -111,6 +124,7 @@ struct ImageData
 }
 
 unittest {
+	// Verify that the returned data isn't the initial struct state
 	auto i = ImageData.fromFile("test/white_line_10px_bmp.bmp");
 	assert(i.res == ImageRes(10, 1));
 	assert(i.dc != ImageDC.init);
