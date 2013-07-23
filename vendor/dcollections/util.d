@@ -67,7 +67,7 @@ final class TransformIterator(V, U=V) : Iterator!(V)
     /**
      * Returns the length that the source provides.
      */
-    @property size_t length() const
+    @property uint length() const
     {
         return _src.length;
     }
@@ -517,7 +517,7 @@ final class ArrayIterator(V) : Iterator!(V)
     /**
      * Returns the array length
      */
-    @property size_t length() const
+    @property uint length() const
     {
         return _array.length;
     }
