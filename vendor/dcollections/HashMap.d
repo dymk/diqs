@@ -155,7 +155,7 @@ final class HashMap(K, V, alias ImplTemp=Hash, alias hashFunction=DefaultHash) :
     /**
      * Function to get the hash of an element
      */
-    static size_t _hashFunction(ref element e)
+    static uint _hashFunction(ref element e)
     {
         return hashFunction(e.key);
     }
@@ -519,7 +519,7 @@ final class HashMap(K, V, alias ImplTemp=Hash, alias hashFunction=DefaultHash) :
 
     final private class KeyIterator : Iterator!(K)
     {
-        @property size_t length() const
+        @property uint length() const
         {
             return this.outer.length;
         }

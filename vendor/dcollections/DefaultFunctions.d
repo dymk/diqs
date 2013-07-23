@@ -53,7 +53,7 @@ bool DefaultLess(V)(ref V v1, ref V v2)
 /**
  * Define the default hash function
  */
-size_t DefaultHash(V)(ref V v)
+uint DefaultHash(V)(ref V v)
 {
     return typeid(V).getHash(&v);
 }
