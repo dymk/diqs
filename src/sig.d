@@ -86,14 +86,20 @@ struct ImageData
 	body
 	{
 		auto ret = ImageData();
-		scope wand = new MagickWand();
-		enforce(wand.readImage(file));
+
+		auto wand = MagickWand.getWand();
+		scope(exit) {
+			MagickWand.disposeWand(wand);
+		}
+
+		enforce(wand.readImage(file), "Couldn't read file: " ~ file);
 		short
 		  width = cast(res_t)wand.imageWidth(),
 		  height = cast(res_t)wand.imageHeight();
 		ret.res = ImageRes(width, height);
 
-		enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.LanczosFilter, 1.0));
+		//enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.CubicFilter, 1.0));
+		enforce(wand.scaleImage(ImageWidth, ImageHeight));
 		scope pixels = wand.exportImagePixelsFlat!YIQ();
 		enforce(pixels);
 

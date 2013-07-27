@@ -11,6 +11,8 @@ extern(C) {
 	  const ssize_t x,const ssize_t y,const size_t columns,
 	  const size_t rows,const char *map,const StorageType storage,
 	  void *pixels);
+	MagickBooleanType MagickScaleImage(WandPtr wand,
+	  const size_t columns,const size_t rows);
 	MagickBooleanType MagickResizeImage(WandPtr wand,
 	  const size_t columns,const size_t rows,
 	  const FilterTypes filter,const double blur);
