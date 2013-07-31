@@ -1,87 +1,137 @@
 module image_db.bucket;
 
 /**
- * Bucket structure that holds a set of user_id_ts which represent
- * ImageDatum that have a given coefficient. Handles insertion,
- * existance checking, and removal of user_id_ts.
+ * Bucket structure that manages an array of IdSets to accomidate fast
+ * building of a database, and easy concurrent searching.
  */
 
 import types :
   user_id_t,
   coeffi_t;
+import image_db;
 
-import std.algorithm :
-  stdAlgoRemove = remove,
-  sort,
-  countUntil,
-  SortedRange,
-  SwapStrategy;
-import std.range : assumeSorted;
-import std.exception : enforce;
-
+import std.array : empty, Appender;
+import std.algorithm : remove, countUntil;
 
 struct Bucket
 {
-	coeffi_t coeff;
+	// A smaller value here means more subsets will be created,
+	// but also that relocation of the sets will be faster
+	enum MAX_SET_LEN = 10_000;
 
-	// Push an ID into the bucket
-	size_t push(user_id_t id)
+	immutable coeffi_t coeff;
+
+	size_t push(in user_id_t id)
 	{
-		enforce(!has(id));
-		m_mem_ids ~= id;
-		m_sorted_mem_ids = sort(m_mem_ids);
-		return length;
+		// First, try appending to the tail of an existing set
+		// to avoid an expensive insert operation
+		foreach(i, ref set; m_insertable_id_sets)
+		{
+			if(set.upper_bound <= id && canAddTo(set))
+			{
+				typeof(return) ret = set.push(id);
+				recheckIsInsertable(set);
+				return ret;
+			}
+		}
+
+		// No luck, find the smallest set and insert into that
+		// TODO: Perhaps find the smallest with std.algorithm.reduce?
+		IdSet* shortest_set = null;
+		foreach(i, ref set; m_insertable_id_sets)
+		{
+			if(shortest_set is null)
+			{
+				shortest_set = set;
+			}
+			else
+			{
+				shortest_set = shortest_set.length < set.length ? shortest_set : set;
+			}
+		}
+		if(shortest_set !is null && shortest_set.length < MAX_SET_LEN)
+		{
+			typeof(return) ret = shortest_set.insert(id);
+			recheckIsInsertable(shortest_set);
+			return ret;
+		}
+
+		// No sets will suffice; just build a new one
+		m_id_sets.put(IdSet(MAX_SET_LEN));
+		IdSet* set = &(m_id_sets.data()[$-1]);
+		auto ret = set.push(id);
+
+		m_insertable_id_sets ~= set;
+
+		return ret;
 	}
 
-	// Test if the bucket contains that ID
-	bool has(user_id_t id)
+	auto has(in user_id_t id)
 	{
-		return m_sorted_mem_ids.contains(id);
+		foreach(ref set; m_id_sets.data())
+		{
+			if(set.has(id))
+				return true;
+		}
+		return false;
 	}
 
-	// Remove an ID from the bucket
-	bool remove(user_id_t id)
-	{
-		// Get the position of the ID
-		auto pos = m_sorted_mem_ids.countUntil(id);
-		if(pos == -1)
-			return false;
-		m_mem_ids = m_mem_ids.stdAlgoRemove(pos);
-		m_sorted_mem_ids = m_mem_ids.assumeSorted();
-		return true;
-	}
-
-	auto ids() @property    { return m_sorted_mem_ids; }
-	auto length() @property { return m_mem_ids.length; }
+	auto sets() @property { return m_id_sets; }
 
 private:
-	user_id_t[] m_mem_ids;
-	SortedRange!(user_id_t[]) m_sorted_mem_ids;
+	// All of the ID sets that this bucket owns
+	Appender!(IdSet[]) m_id_sets;
+	// Array of sets under MAX_SET_LEN
+	IdSet*[]           m_insertable_id_sets;
+
+	// Can s have an ID inserted/pushed onto it?
+	static bool canAddTo(IdSet* s)
+	{
+		return s.length < MAX_SET_LEN;
+	}
+
+	// Rechecs if s is still insertable, and if it's not,
+	// remove it from m_insertable_id_sets
+	bool recheckIsInsertable(IdSet* s)
+	{
+		if(canAddTo(s))
+			return false;
+		foreach(i, os; m_insertable_id_sets)
+		{
+			if(os is s)
+			{
+				m_insertable_id_sets.remove(i);
+				return true;
+			}
+		}
+		return false;
+	}
+
 }
 
-version(unittest) {
-	import std.algorithm : equal;
+unittest {
+	auto b = Bucket();
+	assert(b.sets.data().length == 0);
 }
 
 unittest {
 	auto b = Bucket();
 	b.push(1);
-	b.push(2);
-	assert(equal(b.ids, [1, 2]));
+	assert(b.sets.data().length == 1);
 }
 
 unittest {
 	auto b = Bucket();
 	b.push(1);
-	b.remove(1);
-	uint[] empty = [];
-	assert(equal(b.ids, empty));
+	assert(b.has(1));
 }
 
 unittest {
 	auto b = Bucket();
-	foreach(i; 0..5)
+	foreach(i; 0..Bucket.MAX_SET_LEN)
 		b.push(i);
-	b.remove(1);
-	assert(equal(b.ids, [0, 2, 3, 4]));
+	assert(b.sets.data().length == 1);
+
+	b.push(Bucket.MAX_SET_LEN);
+	assert(b.sets.data().length == 2);
 }
