@@ -5,9 +5,10 @@ module image_db.id_set;
  * tracks the upper and lower bounds of the contained set.
  */
 
-import types :
-  user_id_t;
-import image_db;
+//import types :
+//  user_id_t;
+alias user_id_t = size_t;
+import reserved_array : ReservedArray;
 
 import std.algorithm :
   stdAlgoRemove = remove,
@@ -17,11 +18,19 @@ import std.algorithm :
 import std.range : assumeSorted;
 import std.array : empty, insertInPlace;
 
+
+alias IdArray = ReservedArray!user_id_t;
+
 struct IdSet
 {
 	// This bucket holds IDs from [lb, ub)
 	user_id_t lower_bound;
 	user_id_t upper_bound;
+
+	this(size_t size_hint)
+	{
+		m_mem_ids = IdArray(size_hint);
+	}
 
 	// Push an ID into the tail of the set
 	size_t push(in user_id_t id)
@@ -31,7 +40,6 @@ struct IdSet
 	}
 	body
 	{
-		// perhaps?	m_mem_ids.insertInPlace(m_mem_ids.length, id);
 		m_mem_ids ~= id;
 		refresh_bounds();
 		return length;
@@ -45,7 +53,7 @@ struct IdSet
 	}
 	body
 	{
-		auto index = indexToInsertAt(m_mem_ids, id);
+		auto index = indexToInsertAt(m_mem_ids.data, id);
 		m_mem_ids.insertInPlace(index, id);
 		return index;
 	}
@@ -63,11 +71,11 @@ struct IdSet
 	{
 		// Get the position of the ID
 		// TODO: Use binary search; not O(n) countUntil
-		auto pos = m_mem_ids.countUntil(id);
+		auto pos = m_mem_ids.data.countUntil(id);
 		if(pos == -1)
 			return false;
 
-		m_mem_ids = m_mem_ids.stdAlgoRemove(pos);
+		m_mem_ids.remove(pos);
 
 		refresh_bounds();
 
@@ -78,7 +86,7 @@ struct IdSet
 	auto ids()          @property { return sortedIds; }
 	auto length()       @property { return m_mem_ids.length; }
 	auto empty()        @property { return m_mem_ids.empty; }
-	auto sortedIds()    @property { return m_mem_ids.assumeSorted(); }
+	auto sortedIds()    @property { return m_mem_ids.data.assumeSorted(); }
 
 private:
 	void refresh_bounds()
@@ -100,7 +108,7 @@ private:
 		return !has(id) && (id >= upper_bound);
 	}
 
-	user_id_t[] m_mem_ids;
+	IdArray m_mem_ids;
 }
 
 // Performs an itterative binary search to find the location an ID should be inserted at

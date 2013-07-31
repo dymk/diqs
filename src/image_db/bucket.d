@@ -17,7 +17,7 @@ struct Bucket
 {
 	// A smaller value here means more subsets will be created,
 	// but also that relocation of the sets will be faster
-	enum MAX_SET_LEN = 5000;
+	enum MAX_SET_LEN = 10_000;
 
 	immutable coeffi_t coeff;
 
