@@ -1,5 +1,6 @@
 module diqs;
 
+//import reserved_array;
 import haar;
 import magick_wand;
 import consts;
@@ -15,7 +16,6 @@ void main()
 
 	auto db = new MemDB();
 
-
 	import std.file;
 	import std.stdio;
 	import std.string;
@@ -23,40 +23,26 @@ void main()
 	import std.array;
 	import core.memory;
 
-	//writeln("Start typing in file names: ");
-	//foreach(line; stdin.byLine()) {
-	//	string s = (cast(string)line).chomp();
-	//	if(s == "") { break; }
-	//	auto imgdata = ImageData.fromFile(s);
-	//	db.addImage(imgdata);
-	//	writeln("Processed ", s);
-	//}
-
 	writeln("Loading images...");
 	auto imgdata = ImageData.fromFile("test/cat_a1.jpg");
-	GC.disable;
-	foreach(i; 0..50_000) {
+	GC.disable();
+	foreach(i; 0..100_000) {
 		db.addImage(imgdata);
-		if(i > 0 && (i % 1000) == 0)
+		if(i > 0 && (i % 10_000) == 0)
+		{
 			writeln(i, " images loaded...");
+
+			//if(i % 10_000)
+			//{
+			//	GC.enable();
+			//	GC.collect();
+			//	GC.disable();
+			//}
+		}
 	}
-	GC.enable;
+	GC.enable();
 
 	writeln("Database has ", db.numImages(), " images.");
-	//writeln("Enter filenames to query against: ");
-
-	//foreach(line; stdin.byLine()) {
-	//	auto str = (cast(string)line).chomp();
-	//	if(isFile(str))
-	//	{
-	//		auto imgdata = ImageData.fromFile(str);
-	//		results = db.query(imgdata, 5);
-	//	}
-	//	else
-	//	{
-	//		writeln("'", str, "' is not a valid file");
-	//	}
-	//}
 
 	//auto a = stdin.byLine().front;
 }
