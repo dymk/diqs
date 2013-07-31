@@ -86,15 +86,15 @@ struct IdSet
 	auto ids()          @property { return sortedIds; }
 	auto length()       @property { return m_mem_ids.length; }
 	auto empty()        @property { return m_mem_ids.empty; }
-	auto sortedIds()    @property { return m_mem_ids.data.assumeSorted(); }
+	auto sortedIds()    @property { return m_mem_ids.data().assumeSorted(); }
 
 private:
 	void refresh_bounds()
 	{
-		if(!sortedIds.empty)
+		if(!m_mem_ids.empty)
 		{
-			lower_bound = sortedIds[0];
-			upper_bound = sortedIds[$-1]+1;
+			lower_bound = m_mem_ids[0];
+			upper_bound = m_mem_ids[$-1]+1;
 		}
 		else
 		{

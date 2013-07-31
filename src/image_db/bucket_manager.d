@@ -4,7 +4,7 @@ module image_db.bucket_manager;
  * Manages a set of buckets for the entire range of possible image coefficients
  */
 
-import image_db;
+import image_db.bucket;
 import types : coeffi_t, chan_t, intern_id_t;
 import sig : ImageSig;
 import consts: NumColorChans, ImageArea;

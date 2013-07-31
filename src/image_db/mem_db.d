@@ -4,7 +4,8 @@ module image_db.mem_db;
  * Represents an in memory, searchable database of images
  */
 
-import image_db;
+import image_db.bucket_manager : BucketManager;
+import image_db.base_db : BaseDB;
 import types :
   user_id_t,
   intern_id_t;

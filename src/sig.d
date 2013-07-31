@@ -10,7 +10,7 @@ import consts :
 	ImageHeight,
 	ImageWidth;
 
-import magick_wand :
+import magick_wand.all :
 	MagickWand,
 	FilterTypes,
 	YIQ;

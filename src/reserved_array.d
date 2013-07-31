@@ -122,6 +122,14 @@ unittest {
 }
 
 unittest {
+	auto r = TestRArray(0);
+	r ~= 1;
+	assert(r.length == 1);
+	assert(r == [1]);
+	assert(r[$-1] == 1);
+}
+
+unittest {
 	auto r = TestRArray();
 	assert(r.empty);
 	assert(r.length == 0);

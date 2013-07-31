@@ -8,7 +8,7 @@ module image_db.bucket;
 import types :
   user_id_t,
   coeffi_t;
-import image_db;
+import image_db.id_set : IdSet;
 
 import std.array : empty, Appender;
 import std.algorithm : remove, countUntil;

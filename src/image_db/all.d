@@ -1,4 +1,4 @@
-module image_db;
+module image_db.all;
 
 public import image_db.bucket;
 public import image_db.id_set;

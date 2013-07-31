@@ -1,6 +1,6 @@
 module magick_wand.wand;
 
-import magick_wand;
+import magick_wand.all;
 
 import std.string;
 import std.exception : enforce;
