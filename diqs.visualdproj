@@ -189,6 +189,31 @@
   <filesToClean>*.obj;*.cmd;*.build;*.json;*.dep</filesToClean>
  </Config>
  <Folder name="diqs">
+  <Folder name="src">
+   <Folder name="image_db">
+    <File path="src\image_db\base_db.d" />
+    <File path="src\image_db\bucket.d" />
+    <File path="src\image_db\bucket_manager.d" />
+    <File path="src\image_db\file_db.d" />
+    <File path="src\image_db\id_set.d" />
+    <File path="src\image_db\mem_db.d" />
+    <File path="src\image_db\package.d" />
+    <File path="src\reserved_array.d" />
+   </Folder>
+   <Folder name="magick_wand">
+    <File path="src\magick_wand\colorspace.d" />
+    <File path="src\magick_wand\funcs.d" />
+    <File path="src\magick_wand\package.d" />
+    <File path="src\magick_wand\types.d" />
+    <File path="src\magick_wand\wand.d" />
+   </Folder>
+   <File path="src\consts.d" />
+   <File path="src\diqs.d" />
+   <File path="src\haar.d" />
+   <File path="src\sig.d" />
+   <File path="src\types.d" />
+   <File path="src\util.d" />
+  </Folder>
   <Folder name="vendor">
    <Folder name="dcollections">
     <Folder name="model">
@@ -216,26 +241,6 @@
     <File path="vendor\dcollections\TreeSet.d" />
     <File path="vendor\dcollections\util.d" />
    </Folder>
-  </Folder>
-  <Folder name="src">
-   <Folder name="image_db">
-    <File path="src\image_db\base_db.d" />
-    <File path="src\image_db\file_db.d" />
-    <File path="src\image_db\package.d" />
-   </Folder>
-   <Folder name="magick_wand">
-    <File path="src\magick_wand\colorspace.d" />
-    <File path="src\magick_wand\funcs.d" />
-    <File path="src\magick_wand\package.d" />
-    <File path="src\magick_wand\types.d" />
-    <File path="src\magick_wand\wand.d" />
-   </Folder>
-   <File path="src\consts.d" />
-   <File path="src\diqs.d" />
-   <File path="src\haar.d" />
-   <File path="src\sig.d" />
-   <File path="src\types.d" />
-   <File path="src\util.d" />
   </Folder>
   <File path=".gitignore" />
   <File path="package.json" />
