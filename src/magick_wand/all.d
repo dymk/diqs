@@ -1,4 +1,4 @@
-module magick_wand;
+module magick_wand.all;
 
 /**
  * The MagickWand Module: A selective wrapper around MagickWand for
@@ -8,7 +8,7 @@ module magick_wand;
 
 version(Windows) {
 	// Many thanks to Destructionator for converting this to OMF
-	pragma(lib, "lib\\win\\wand");
+	pragma(lib, "lib\\win\\CORE_RL_wand_omf_");
 } else version(Posix) {
 	pragma(lib, "wand");
 }

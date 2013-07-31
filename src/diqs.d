@@ -2,10 +2,10 @@ module diqs;
 
 //import reserved_array;
 import haar;
-import magick_wand;
+import magick_wand.all;
 import consts;
 import types;
-import image_db;
+import image_db.all;
 import sig : IDImageData;
 
 void main()

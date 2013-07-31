@@ -1,6 +1,10 @@
 module magick_wand.funcs;
 
-import magick_wand;
+import magick_wand.types :
+  WandPtr,
+  MagickBooleanType,
+  StorageType,
+  FilterTypes;
 
 alias ssize_t = ptrdiff_t;
 
