@@ -7,8 +7,12 @@ module magick_wand.all;
  */
 
 version(Windows) {
-	// Many thanks to Destructionator for converting this to OMF
-	pragma(lib, "lib\\win\\CORE_RL_wand_omf_");
+	version(X86_64) {
+		pragma(lib, "lib\\win\\64\\CORE_RL_wand_");
+	} else {
+		// Many thanks to Destructionator for converting this to OMF
+		pragma(lib, "lib\\win\\32\\CORE_RL_wand_omf_");
+	}
 } else version(Posix) {
 	pragma(lib, "wand");
 }

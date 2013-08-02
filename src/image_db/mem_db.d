@@ -15,11 +15,8 @@ import sig :
 	ImageData,
 	IDImageData;
 
-import dcollections.HashMap : HashMap;
-
 class MemDB : BaseDB
 {
-	//alias UserInternMap = HashMap!(user_id_t, intern_id_t);
 
 	struct IDImageSansSig
 	{
@@ -43,7 +40,7 @@ class MemDB : BaseDB
 		immutable res = imgdata.res;
 
 		// Next ID is just the next available spot in the in-mem array
-		immutable user_id_t user_id = m_mem_imgs.length;
+		immutable user_id_t user_id = cast(user_id_t) m_mem_imgs.length;
 
 		immutable img = IDImageData(user_id, sig, dc, res);
 

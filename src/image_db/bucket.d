@@ -9,17 +9,16 @@ import types :
   user_id_t,
   coeffi_t;
 import image_db.id_set : IdSet;
+import reserved_array : ReservedArray;
 
-import std.array : empty, Appender;
+import std.array : empty;
 import std.algorithm : remove, countUntil;
 
 struct Bucket
 {
 	// A smaller value here means more subsets will be created,
 	// but also that relocation of the sets will be faster
-	enum MAX_SET_LEN = 10_000;
-
-	immutable coeffi_t coeff;
+	enum MAX_SET_LEN = 1_000_000;
 
 	size_t push(in user_id_t id)
 	{
@@ -57,7 +56,7 @@ struct Bucket
 		}
 
 		// No sets will suffice; just build a new one
-		m_id_sets.put(IdSet(MAX_SET_LEN));
+		m_id_sets.append(IdSet(MAX_SET_LEN));
 		IdSet* set = &(m_id_sets.data()[$-1]);
 		auto ret = set.push(id);
 
@@ -80,7 +79,7 @@ struct Bucket
 
 private:
 	// All of the ID sets that this bucket owns
-	Appender!(IdSet[]) m_id_sets;
+	ReservedArray!IdSet m_id_sets;
 	// Array of sets under MAX_SET_LEN
 	IdSet*[]           m_insertable_id_sets;
 

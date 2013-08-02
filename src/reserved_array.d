@@ -45,7 +45,7 @@ struct ReservedArray(T)
 
 	bool opEquals(const T[] other)
 	{
-		return equal(data, other);
+		return equal(cast(Unqual!(T)[]) data, cast(Unqual!(T)[]) other);
 	}
 
 	void opAssign(T[] other)
