@@ -11,16 +11,7 @@ import consts: NumColorChans, ImageArea;
 
 final class BucketManager
 {
-	this()
-	{
-		foreach(chan; 0..NumColorChans)
-		{
-			foreach(short b_index; 0..m_buckets[chan].length) {
-				auto coeff = coeffForBucketIndex(b_index);
-				m_buckets[chan][b_index] = Bucket(coeff);
-			}
-		}
-	}
+	this() {}
 
 	auto addSig(intern_id_t id, const ref ImageSig sig)
 	{

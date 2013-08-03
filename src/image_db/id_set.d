@@ -5,9 +5,8 @@ module image_db.id_set;
  * tracks the upper and lower bounds of the contained set.
  */
 
-//import types :
-//  user_id_t;
-alias user_id_t = size_t;
+import types :
+  user_id_t;
 import reserved_array : ReservedArray;
 
 import std.algorithm :
