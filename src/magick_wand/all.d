@@ -14,7 +14,8 @@ version(Windows) {
 		pragma(lib, "lib\\win\\32\\CORE_RL_wand_omf_");
 	}
 } else version(Posix) {
-	pragma(lib, "wand");
+	pragma(lib, "MagickWand");
+	pragma(lib, "MagickCore");
 }
 
 public import magick_wand.types;

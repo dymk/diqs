@@ -1,5 +1,5 @@
 # DC = dmd
-DC := ~/code/d/ldc/build-ldc2-x64/bin/Debug/ldmd2
+DC := dmd
 ifeq (64,$(MODEL))
   DC_FLAGS = -m64
 endif
@@ -11,7 +11,7 @@ DEBUG_FLAGS    = -debug -g -dw -unittest
 UNITTEST_FLAGS = $(DEBUG_FLAGS)
 
 # Detect the DMD version, because -inline causes problems in 2.063
-ifneq (,$(findstring 2.063,$(shell $(DC) | head -1)))
+ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
   $(info -----------------------------------------------------------------------------------------)
   $(info DMD 2.063's -inline won't work in this application. It is highly suggested you use 2.064.)
   $(info -----------------------------------------------------------------------------------------)
@@ -47,7 +47,7 @@ else
 endif
 
 LINK ?= $(DC)
-LINK_FLAGS ?= -of$(DIQS_BIN) -g
+LINK_FLAGS ?= -v -of$(DIQS_BIN) -L-I/usr/include/ImageMagick -L-lMagickWand -L-lMagickCore -g
 
 # Build the import directory string out of the given import directories
 # (append -I to each directory)
