@@ -55,7 +55,7 @@ struct ImageSig
 	ref auto q() @property { return sigs[2]; }
 }
 
-struct ImageDC
+struct ImageDc
 {
 	// DC coefficents (first component) of the haar decomposed image
 	dc_t y, i, q;
@@ -66,10 +66,16 @@ struct ImageRes
 	res_t width, height;
 }
 
-struct ImageData
+struct ImageDcRes
+{
+	ImageDc dc;
+	ImageRes res;
+}
+
+struct ImageSigDcRes
 {
 	ImageSig sig;
-	ImageDC dc;
+	ImageDc dc;
 	ImageRes res;
 
 	static auto fromFile(string file)
@@ -85,7 +91,7 @@ struct ImageData
 	}
 	body
 	{
-		auto ret = ImageData();
+		auto ret = ImageSigDcRes();
 
 		auto wand = MagickWand.getWand();
 		scope(exit) {
@@ -111,7 +117,7 @@ struct ImageData
 		haar2d(ichan, ImageWidth, ImageHeight);
 		haar2d(qchan, ImageWidth, ImageHeight);
 
-		ret.dc = ImageDC(ychan[0], ichan[0], qchan[0]);
+		ret.dc = ImageDc(ychan[0], ichan[0], qchan[0]);
 
 		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs, 1);
 		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs, 1);
@@ -131,18 +137,18 @@ struct ImageData
 
 unittest {
 	// Verify that the returned data isn't the initial struct state
-	auto i = ImageData.fromFile("test/white_line_10px_bmp.bmp");
+	auto i = ImageSigDcRes.fromFile("test/white_line_10px_bmp.bmp");
 	assert(i.res == ImageRes(10, 1));
-	assert(i.dc != ImageDC.init);
+	assert(i.dc != ImageDc.init);
 	assert(i.sig != ImageSig.init);
 }
 
 /// For now, used when serializing image data to the disk
 /// so an immutable user ID can be associated with it
-struct IDImageData
+struct ImageIdSigDcRes
 {
 	user_id_t user_id;
 	ImageSig sig;
-	ImageDC dc;
+	ImageDc dc;
 	ImageRes res;
 }
