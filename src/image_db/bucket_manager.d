@@ -13,7 +13,7 @@ final class BucketManager
 {
 	this() {}
 
-	auto addSig(intern_id_t id, const ref ImageSig sig)
+	auto addSig(intern_id_t id, const ImageSig sig)
 	{
 		// populate the relevant buckets with that image's data
 		foreach(char chan; 0..sig.sigs.length)

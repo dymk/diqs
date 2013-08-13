@@ -123,6 +123,7 @@ private:
 	WandPtr wandPtr = null;
 }
 
+version(none) {
 // isMagickWand
 unittest {
 	scope wand = new MagickWand;
@@ -174,4 +175,5 @@ unittest {
 	foreach(p; px[0]) {
 		assert(p == RGB(255, 255, 255));
 	}
+}
 }

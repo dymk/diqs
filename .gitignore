@@ -3,6 +3,8 @@
 *.obj
 *.suo
 *.user
+*.pdb
+*.ilk
 
 *.sublime-project
 *.sublime-workspace

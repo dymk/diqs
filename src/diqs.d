@@ -15,8 +15,7 @@ void main()
 	writeln("Size of IDImageData: ", IDImageData.sizeof);
 	writeln("Size of BucketManager: ", __traits(classInstanceSize, BucketManager));
 	writeln("Size of Bucket: ", Bucket.sizeof);
-	writeln("Size of RA!user_id_t: ", ResservedArray!user_id_t.sizeof);
-	writeln("Foo!");
+	writeln("Size of size_t: ", size_t.sizeof);
 
 	auto db = new MemDB();
 
