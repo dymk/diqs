@@ -5,6 +5,7 @@
 *.user
 *.pdb
 *.ilk
+*.log
 
 *.sublime-project
 *.sublime-workspace
@@ -12,4 +13,5 @@
 bin/*
 Debug/*
 Release/*
+Unittest/*
 test/ignore/*

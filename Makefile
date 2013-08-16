@@ -1,4 +1,4 @@
-DC ?= ldmd2
+DC ?= ldmd2 -v
 
 ifeq (64,$(MODEL))
   DC_FLAGS += -m64
@@ -6,9 +6,9 @@ else
   DC_FLAGS += -m32
 endif
 
-RELEASE_FLAGS  := # -release -O -noboundscheck
-DEBUG_FLAGS    := -debug -de -unittest -g
-UNITTEST_FLAGS := -unittest -g
+RELEASE_FLAGS  := -O -release -noboundscheck
+DEBUG_FLAGS    := -debug -de -g
+UNITTEST_FLAGS := -unittest -g -debug
 
 # Detect the DMD version, because -inline causes problems in 2.063
 ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))

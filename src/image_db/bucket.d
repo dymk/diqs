@@ -8,129 +8,165 @@ module image_db.bucket;
 import types :
   user_id_t,
   coeffi_t;
-import image_db.id_set : IdSet;
-import reserved_array : ReservedArray;
 
 import std.array : empty;
 import std.algorithm : remove, countUntil;
+import reserved_array : ReservedArray;
 
-struct Bucket
-{
-	// A smaller value here means more subsets will be created,
-	// but also that relocation of the sets will be faster
-	enum MAX_SET_LEN = 1_000_000;
+version(UseIdSet) {
+	pragma(msg, "Using IdSet version of Bucket");
 
-	size_t push(in user_id_t id)
+	import image_db.id_set : IdSet;
+
+	struct Bucket
 	{
-		// First, try appending to the tail of an existing set
-		// to avoid an expensive insert operation
-		foreach(i, ref set; m_insertable_id_sets)
+		// A smaller value here means more subsets will be created,
+		// but also that relocation of the sets will be faster
+		enum MAX_SET_LEN = 1_000_000;
+
+		size_t push(in user_id_t id)
 		{
-			if(set.upper_bound <= id && canAddTo(set))
+			// First, try appending to the tail of an existing set
+			// to avoid an expensive insert operation
+			foreach(i, ref set; m_insertable_id_sets)
 			{
-				typeof(return) ret = set.push(id);
-				recheckIsInsertable(set);
+				if(set.upper_bound <= id && canAddTo(set))
+				{
+					typeof(return) ret = set.push(id);
+					recheckIsInsertable(set);
+					return ret;
+				}
+			}
+
+			// No luck, find the smallest set and insert into that
+			// TODO: Perhaps find the smallest with std.algorithm.reduce?
+			IdSet* shortest_set = null;
+			foreach(i, ref set; m_insertable_id_sets)
+			{
+				if(shortest_set is null)
+				{
+					shortest_set = set;
+				}
+				else
+				{
+					shortest_set = shortest_set.length < set.length ? shortest_set : set;
+				}
+			}
+			if(shortest_set !is null && shortest_set.length < MAX_SET_LEN)
+			{
+				typeof(return) ret = shortest_set.insert(id);
+				recheckIsInsertable(shortest_set);
 				return ret;
 			}
-		}
 
-		// No luck, find the smallest set and insert into that
-		// TODO: Perhaps find the smallest with std.algorithm.reduce?
-		IdSet* shortest_set = null;
-		foreach(i, ref set; m_insertable_id_sets)
-		{
-			if(shortest_set is null)
-			{
-				shortest_set = set;
-			}
-			else
-			{
-				shortest_set = shortest_set.length < set.length ? shortest_set : set;
-			}
-		}
-		if(shortest_set !is null && shortest_set.length < MAX_SET_LEN)
-		{
-			typeof(return) ret = shortest_set.insert(id);
-			recheckIsInsertable(shortest_set);
+			// No sets will suffice; just build a new one
+			m_id_sets.append(IdSet(MAX_SET_LEN));
+			IdSet* set = &(m_id_sets.data()[$-1]);
+			auto ret = set.push(id);
+
+			m_insertable_id_sets ~= set;
+
 			return ret;
 		}
 
-		// No sets will suffice; just build a new one
-		m_id_sets.append(IdSet(MAX_SET_LEN));
-		IdSet* set = &(m_id_sets.data()[$-1]);
-		auto ret = set.push(id);
-
-		m_insertable_id_sets ~= set;
-
-		return ret;
-	}
-
-	auto has(in user_id_t id)
-	{
-		foreach(ref set; m_id_sets.data())
+		auto has(in user_id_t id)
 		{
-			if(set.has(id))
-				return true;
-		}
-		return false;
-	}
-
-	auto sets() @property { return m_id_sets; }
-
-private:
-	// All of the ID sets that this bucket owns
-	ReservedArray!IdSet m_id_sets;
-	// Array of sets under MAX_SET_LEN
-	IdSet*[]           m_insertable_id_sets;
-
-	// Can s have an ID inserted/pushed onto it?
-	static bool canAddTo(IdSet* s)
-	{
-		return s.length < MAX_SET_LEN;
-	}
-
-	// Rechecs if s is still insertable, and if it's not,
-	// remove it from m_insertable_id_sets
-	bool recheckIsInsertable(IdSet* s)
-	{
-		if(canAddTo(s))
-			return false;
-		foreach(i, os; m_insertable_id_sets)
-		{
-			if(os is s)
+			foreach(ref set; m_id_sets.data())
 			{
-				m_insertable_id_sets.remove(i);
-				return true;
+				if(set.has(id))
+					return true;
 			}
+			return false;
 		}
-		return false;
+
+		auto sets() @property { return m_id_sets; }
+
+	private:
+		// All of the ID sets that this bucket owns
+		ReservedArray!IdSet m_id_sets;
+		// Array of sets under MAX_SET_LEN
+		IdSet*[]           m_insertable_id_sets;
+
+		// Can s have an ID inserted/pushed onto it?
+		static bool canAddTo(IdSet* s)
+		{
+			return s.length < MAX_SET_LEN;
+		}
+
+		// Rechecs if s is still insertable, and if it's not,
+		// remove it from m_insertable_id_sets
+		bool recheckIsInsertable(IdSet* s)
+		{
+			if(canAddTo(s))
+				return false;
+			foreach(i, os; m_insertable_id_sets)
+			{
+				if(os is s)
+				{
+					m_insertable_id_sets.remove(i);
+					return true;
+				}
+			}
+			return false;
+		}
+
+	}
+	unittest {
+		auto b = Bucket();
+		assert(b.sets.data().length == 0);
 	}
 
+	unittest {
+		auto b = Bucket();
+		b.push(1);
+		assert(b.sets.data().length == 1);
+	}
+
+	unittest {
+		auto b = Bucket();
+		b.push(1);
+		assert(b.has(1));
+	}
+
+	unittest {
+		auto b = Bucket();
+		foreach(i; 0..Bucket.MAX_SET_LEN)
+			b.push(i);
+		assert(b.sets.data().length == 1);
+
+		b.push(Bucket.MAX_SET_LEN);
+		assert(b.sets.data().length == 2);
+	}
+}
+else
+{
+	pragma(msg, "Using DeltaQueue version of Bucket");
+
+	import delta_queue : DeltaQueue;
+
+	struct Bucket
+	{
+		enum MAX_SET_LEN = 100_000;
+
+		size_t push(user_id_t id)
+		{
+			DeltaQueue* dq;
+
+			if(m_id_sets[].empty || !m_id_sets[][$-1].has_room(id))
+			{
+				m_id_sets.append(DeltaQueue(MAX_SET_LEN));
+			}
+			dq = &m_id_sets[][$-1];
+
+			return dq.push(id);
+		}
+
+		const(DeltaQueue[]) sets() {
+			return m_id_sets[];
+		}
+
+	private:
+		ReservedArray!DeltaQueue m_id_sets;
+	}
 }
 
-unittest {
-	auto b = Bucket();
-	assert(b.sets.data().length == 0);
-}
-
-unittest {
-	auto b = Bucket();
-	b.push(1);
-	assert(b.sets.data().length == 1);
-}
-
-unittest {
-	auto b = Bucket();
-	b.push(1);
-	assert(b.has(1));
-}
-
-unittest {
-	auto b = Bucket();
-	foreach(i; 0..Bucket.MAX_SET_LEN)
-		b.push(i);
-	assert(b.sets.data().length == 1);
-
-	b.push(Bucket.MAX_SET_LEN);
-	assert(b.sets.data().length == 2);
-}

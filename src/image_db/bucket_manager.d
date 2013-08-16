@@ -11,14 +11,19 @@ import consts: NumColorChans, ImageArea;
 
 final class BucketManager
 {
-	this() {}
+	this() {
+		auto chan_length = (ImageArea*2)-1;
+		foreach(ref chan; m_buckets)
+		{
+			chan = new Bucket[chan_length];
+		}
+	}
 
-	auto addSig(intern_id_t id, const ImageSig sig)
+	void addSig(intern_id_t id, in ImageSig sig)
 	{
 		// populate the relevant buckets with that image's data
-		foreach(char chan; 0..sig.sigs.length)
+		foreach(ubyte chan; 0..sig.sigs.length)
 		{
-			auto bucket_chan = m_buckets[chan];
 			foreach(coeffi_t coeff; sig.sigs[chan])
 			{
 				bucketForCoeff(coeff, chan).push(id);
@@ -59,7 +64,7 @@ final class BucketManager
 	}
 
 private:
-	Bucket[(ImageArea*2)-1][NumColorChans] m_buckets;
+	Bucket[][NumColorChans] m_buckets;
 }
 
 unittest {

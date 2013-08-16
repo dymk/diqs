@@ -12,11 +12,16 @@ version(Windows) {
 		pragma(msg, "Linking with 64 bit ImageMagick");
 	} else {
 		// Many thanks to Destructionator for converting this to OMF
-		pragma(lib, "lib\\win\\32\\CORE_RL_wand_omf_");
+		version(DigitalMars) {
+			pragma(lib, "lib\\win\\32\\CORE_RL_wand_omf_");
+		} else {
+			pragma(lib, "lib\\win\\32\\CORE_RL_wand_");
+		}
 		pragma(msg, "Linking with 32 bit ImageMagick");
 	}
 } else version(Posix) {
-	pragma(lib, "wand");
+	pragma(lib, "MagickWand");
+	pragma(lib, "MagickCore");
 }
 
 public import magick_wand.types;
