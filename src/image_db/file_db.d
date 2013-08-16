@@ -20,7 +20,7 @@
 //	ImageDC,
 //	IDImageData;
 
-//import image_db : BaseDB, Bucket;
+//import image_db : BaseDb, Bucket;
 //import consts : ImageArea, NumColorChans;
 
 //import dcollections.HashMap : HashMap;
@@ -33,7 +33,7 @@
 // * - IDImageData      |
 // */
 
-//class FileDB : BaseDB
+//class FileDB : BaseDb
 //{
 //	alias UserInternMap = HashMap!(user_id_t, intern_id_t);
 
