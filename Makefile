@@ -16,18 +16,9 @@ endif
 #   UNITTEST_FLAGS += -op
 # endif
 
-RELEASE_FLAGS  += -O -release -noboundscheck
+RELEASE_FLAGS  += -O -release -noboundscheck -inline
 DEBUG_FLAGS    += -debug -de -g
 UNITTEST_FLAGS += -unittest -debug -g
-
-# Detect the DMD version, because -inline causes problems in 2.063
-ifneq (,$(findstring 2.063,$(DC_OUT)))
-  $(info -----------------------------------------------------------------------------------------)
-  $(info DMD 2.063's -inline won't work in this application. It is highly suggested you use 2.064.)
-  $(info -----------------------------------------------------------------------------------------)
-else
-  RELEASE_FLAGS += -inline
-endif
 
 # Build the import directory string out of the given import directories
 # (append -I to each directory)
