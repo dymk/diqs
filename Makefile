@@ -1,17 +1,27 @@
 DC ?= ldmd2 -v
 
+DC_OUT = $(shell $(DC) 2>/dev/null | head -1)
+
 ifeq (64,$(MODEL))
   DC_FLAGS += -m64
 else
   DC_FLAGS += -m32
 endif
 
-RELEASE_FLAGS  := -O -release -noboundscheck
-DEBUG_FLAGS    := -debug -de -g
-UNITTEST_FLAGS := -unittest -g -debug
+# ifneq (,$(findstring LDC,$(DC_OUT)))
+#   $(info LDC detected: Appending -op and LARGEADDRESSAWARE flags)
+#   # LDC, for some reason, doens't compile with large addresses in mind.
+#   DC_FLAGS += -L"-LARGEADDRESSAWARE"
+#   DEBUG_FLAGS += -op
+#   UNITTEST_FLAGS += -op
+# endif
+
+RELEASE_FLAGS  += -O -release -noboundscheck
+DEBUG_FLAGS    += -debug -de -g
+UNITTEST_FLAGS += -unittest -debug -g
 
 # Detect the DMD version, because -inline causes problems in 2.063
-ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
+ifneq (,$(findstring 2.063,$(DC_OUT)))
   $(info -----------------------------------------------------------------------------------------)
   $(info DMD 2.063's -inline won't work in this application. It is highly suggested you use 2.064.)
   $(info -----------------------------------------------------------------------------------------)

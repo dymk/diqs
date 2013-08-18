@@ -4,6 +4,7 @@ module delta_queue;
  * Based off of Piespy's delta_queue, in IQDB
  */
 
+import core.memory : GC;
 debug {
 	import std.stdio : stderr, writeln;
 }
@@ -16,22 +17,40 @@ struct DeltaQueue
 		reserve(amt);
 	}
 
+	// Reserves a bit more than what amt should be able to hold,
+	// as a few values that will trigger a marker byte are bound
+	// to be passed in at some point or another. Reserves enough
+	// space for 16 marker bytes.
 	auto reserve(size_t amt) {
-		return data.reserve(amt + (16*size_t.sizeof));
+		return data.reserve(amt + (16*(size_t.sizeof+1)));
 	}
 
+	// Reserves an exact number of bytes. Used mostly internally
+	// in the remove() method.
+	auto reserve_exact(size_t amt) {
+		return data.reserve(amt);
+	}
+
+	// Returns true or false if there is enough internal room to
+	// push `num` to the internal data store.
 	bool has_room(size_t num) {
+		// Can the number be stored as a delta value, or as a new run?
 		auto delta_can_fit = num > last_value && (num - last_value <= ubyte.max);
-		auto needed_size  = delta_can_fit ? ubyte.sizeof : size_t.sizeof;
-		return data.capacity > (data.length + needed_size);
+		auto required_bytes  = delta_can_fit ? ubyte.sizeof : size_t.sizeof;
+		return data.capacity > (data.length + required_bytes);
 	}
 
+	// Pessimistic has_room(). Assumes that the next number pushed
+	// will start a new run.
 	bool has_room() {
 		return data.capacity > (data.length + size_t.sizeof);
 	}
 
+	// Pushes a value onto the delta queue.
 	size_t push(size_t push_value) {
-		debug {
+
+		version(DebugDeltaQueue)
+		{
 			if(data.length >= data.capacity || !has_room(push_value)) {
 				stderr.writeln("Warning: Will need to expand size of DeltaQueue (current length: ", data.length, ")");
 			}
@@ -56,13 +75,70 @@ struct DeltaQueue
 			data[oldlen] = delta;
 		}
 		last_value = push_value;
-		length++;
-		return length;
+		_length++;
+		return _length;
 	}
 
+	// Removes all instances of rm_value from the delta_queue.
+	// Terribly inefficient, but easy to reason about. Don't
+	// call it in tight loops.
+	// TODO: Make more efficient. Dunno how.
+	bool remove(size_t rm_value)
+	{
+		// A nieve implementation that removes by totally rebuilding the
+		// data[] array, skipping matching rm_values. It shouldn't
+		// impact run speed by too much, because delta_queues are typically
+		// only a few thousand elements long.
+
+		// Basic speed hack to not allocate oodles of memory and then not
+		// remove any values.
+		if(!this.has(rm_value))
+		{
+			return false;
+		}
+
+		bool removed = false;
+		DeltaQueue d;
+		d.reserve_exact(this.length);
+
+		foreach(i; this[]) {
+			if(i == rm_value)
+			{
+				removed = true;
+			}
+			else
+			{
+				d.push(i);
+			}
+		}
+
+		// Not exactly safe, so don't retain references to
+		// ranges returned by delta_queues longer than you
+		// really need to.
+		GC.free(data.ptr);
+		this.data = d.data;
+		this._length = d.length;
+
+		return removed;
+	}
+
+	// Used to slightly optimize remove()
+	bool has(size_t value)
+	{
+		foreach(i; this[]) {
+			if(i == value) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// Returs the associated Range for a delta_queue.
 	Range opSlice() {
 		return Range(this.data, this.length);
 	}
+
+	auto length()   @property { return this._length; }
 
 	struct Range {
 		this(ubyte[] data, size_t length)
@@ -99,8 +175,8 @@ struct DeltaQueue
 			}
 		}
 
-		auto length() { return this._length; }
-		bool empty()  { return data_pos > data.length || data.length == 0; }
+		auto length()   @property { return this._length; }
+		bool empty()    @property { return data_pos > data.length || data.length == 0; }
 
 		private {
 			ubyte[] data;
@@ -110,9 +186,9 @@ struct DeltaQueue
 		}
 	}
 
+	ubyte[] data;
 	private {
-		ubyte[] data;
-		size_t length;
+		size_t _length;
 		size_t last_value;
 	}
 }
@@ -120,7 +196,9 @@ struct DeltaQueue
 version(unittest) {
 	import std.algorithm : equal;
 	import std.range : iota, repeat;
+	size_t[] empty_arr = [];
 }
+
 unittest {
 	DeltaQueue d;
 	d.push(2);
@@ -158,6 +236,46 @@ unittest {
 
 unittest {
 	DeltaQueue d;
-	size_t[] empty = [];
-	assert(equal(d[], empty));
+	assert(equal(d[], empty_arr));
+}
+
+unittest {
+	DeltaQueue d;
+	d.push(1);
+	d.push(2);
+	d.push(3);
+	assert(d.length == 3);
+
+	d.remove(2);
+	assert(d.length == 2);
+}
+
+unittest {
+	DeltaQueue d;
+	d.push(1);
+	d.push(2);
+	d.push(3);
+
+	d.remove(2);
+	assert(equal(d[], [1, 3]));
+}
+
+unittest {
+	DeltaQueue d;
+	d.push(1);
+	d.remove(1);
+	auto slice = d[];
+
+	assert(equal(d[], empty_arr));
+}
+
+unittest {
+	DeltaQueue d;
+	d.push(1);
+	assert(d.remove(1) == true);
+}
+
+unittest {
+	DeltaQueue d;
+	assert(d.remove(1) == false);
 }
