@@ -10,7 +10,7 @@ import types :
   coeffi_t;
 
 import std.array : empty;
-import std.algorithm : remove, countUntil;
+import std.algorithm : remove, countUntil, reduce, map;
 import reserved_array : ReservedArray;
 
 version(UseIdSet) {
@@ -148,6 +148,14 @@ else
 	{
 		enum MAX_SET_LEN = 100_000;
 
+		size_t push(user_id_t[] ids)
+		{
+			foreach(id; ids) {
+				push(id);
+			}
+
+			return length();
+		}
 		size_t push(user_id_t id)
 		{
 			DeltaQueue* dq;
@@ -161,12 +169,108 @@ else
 			return dq.push(id);
 		}
 
+		bool remove(user_id_t id)
+		{
+			foreach(ref dq; m_id_sets)
+			{
+				if(dq.remove(id))
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		Range opSlice()
+		{
+			return Range(m_id_sets[]);
+		}
+
+		size_t length() {
+			return reduce!((a, b) => a + b)(cast(size_t)0, m_id_sets[].map!(a => a.length));
+		}
+
+		struct Range
+		{
+			this(DeltaQueue[] sets)
+			{
+				this.sets = sets;
+				if(this.sets.length)
+				{
+					current_set = this.sets[0][];
+				}
+			}
+
+			bool empty() { return sets.length == 0 || current_set.empty; }
+			user_id_t front() {
+				return current_set.front;
+			}
+			void popFront() {
+				current_set.popFront();
+				if(current_set.empty)
+				{
+					sets = sets[1..$];
+					if(sets.length) {
+						current_set = sets[0][];
+					}
+				}
+			}
+
+			private {
+				DeltaQueue[] sets;
+				DeltaQueue.Range current_set;
+			}
+		}
+
 		const(DeltaQueue[]) sets() {
 			return m_id_sets[];
 		}
 
 	private:
 		ReservedArray!DeltaQueue m_id_sets;
+	}
+
+	version(unittest) {
+		import std.algorithm : equal;
+	}
+
+	unittest {
+		Bucket b;
+		b.push([1, 2, 3, 4, 5]);
+		assert(b.length == 5);
+	}
+
+	unittest {
+		Bucket b;
+		b.push([1, 2, 3, 4, 5]);
+		assert(equal(b[], [1, 2, 3, 4, 5]));
+	}
+
+	unittest {
+		Bucket b;
+		b.push([1, 2, 3, 4, 5]);
+		assert(b.remove(1) == true);
+		assert(b.length == 4);
+	}
+
+	unittest {
+		Bucket b;
+		assert(b.length == 0);
+	}
+
+	unittest {
+		Bucket b;
+		b.push(1);
+		assert(equal(b[], [1]));
+	}
+
+	unittest {
+		Bucket b;
+		b.push([1, 2, 3]);
+		assert(b.remove(4) == false);
+		assert(b.remove(0) == false);
+		assert(b.remove(1) == true);
+		assert(b.remove(1) == false);
 	}
 }
 

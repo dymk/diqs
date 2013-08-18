@@ -53,6 +53,25 @@ struct ImageSig
 	ref auto y() @property { return sigs[0]; }
 	ref auto i() @property { return sigs[1]; }
 	ref auto q() @property { return sigs[2]; }
+
+	version(unittest)
+	{
+		import std.algorithm : sort;
+
+		bool sameAs(in ImageSig other)
+		{
+			ImageSig o_dup = other;
+			ImageSig t_dup = this;
+
+			foreach(i; 0..NumColorChans)
+			{
+				o_dup.sigs[i][].sort();
+				t_dup.sigs[i][].sort();
+			}
+
+			return o_dup == t_dup;
+		}
+	}
 }
 
 struct ImageDc
