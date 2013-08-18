@@ -11,6 +11,8 @@ import sig : CoeffIPair;
 import std.range : isInputRange, array, zip, iota;
 import std.algorithm : map, sort;
 
+import std.math : abs;
+
 T min(T)(T a, T b)
 {
 	return (a < b) ? a : b;
@@ -41,7 +43,8 @@ if(is(C : coeff_t))
 		scope coeff_set = coeffs[i..$].map!(a => CoeffIPair(i++, a))().array();
 	}
 
-	sort!("std.math.abs(a.coeff) > std.math.abs(b.coeff)")(coeff_set);
+	sort!((a, b) => abs(a.coeff) > abs(b.coeff))(coeff_set);
+
 	return coeff_set[0..num_coeffs
 	].array(); //.array because coeff_set is scope
 }

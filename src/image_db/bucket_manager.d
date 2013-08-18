@@ -16,6 +16,7 @@ import consts :
   NumSigCoeffs;
 
 import std.exception : enforce;
+import std.conv : to;
 
 final class BucketManager
 {
@@ -41,7 +42,7 @@ final class BucketManager
 	}
 
 	// Simple wrapper function to move 'from' to 'to'
-	void moveId(intern_id_t from, intern_id_t to)
+	void moveId(const intern_id_t from, const intern_id_t to)
 	{
 		auto rm_sig = removeId(from);
 		addSig(to, rm_sig);
@@ -67,7 +68,7 @@ final class BucketManager
 					found++;
 				}
 			}
-			enforce(found == NumSigCoeffs);
+			enforce(found == NumSigCoeffs, "Image with internal ID " ~ to!string(intern_id) ~ " didn't have enough coeffs (found: " ~ to!string(found) ~ ")");
 		}
 		this._length--;
 		return ret;
@@ -166,5 +167,13 @@ unittest {
 	auto f = new BucketManager();
 	f.addSig(1, sig);
 	auto ret = f.removeId(1);
+	assert(ret.sameAs(sig));
+}
+
+unittest {
+	auto f = new BucketManager();
+	f.addSig(1, sig);
+	f.moveId(1, 2);
+	auto ret = f.removeId(2);
 	assert(ret.sameAs(sig));
 }

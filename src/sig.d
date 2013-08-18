@@ -58,7 +58,7 @@ struct ImageSig
 	{
 		import std.algorithm : sort;
 
-		bool sameAs(in ImageSig other)
+		bool sameAs(in ImageSig other) const
 		{
 			ImageSig o_dup = other;
 			ImageSig t_dup = this;
@@ -87,6 +87,13 @@ struct ImageRes
 
 struct ImageDcRes
 {
+	ImageDc dc;
+	ImageRes res;
+}
+
+struct ImageIdDcRes
+{
+	user_id_t user_id;
 	ImageDc dc;
 	ImageRes res;
 }
@@ -145,9 +152,10 @@ struct ImageSigDcRes
 		auto sig = ImageSig();
 		// Add 1 to all of the indexes, because largestCoeff was passed the tail of
 		// the channel, so all coeffs' indexes were shifted left.
-		ylargest.map!(a => a.index)().copy(sig.y[]);
-		ilargest.map!(a => a.index)().copy(sig.i[]);
-		qlargest.map!(a => a.index)().copy(sig.q[]);
+		// If coeff is negative, make the index negative as well.
+		ylargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.y[]);
+		ilargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.i[]);
+		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
 		ret.sig = sig;
 
 		return ret;

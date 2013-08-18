@@ -17,30 +17,52 @@ void main()
 
 	auto db = new MemDb();
 
+	version(unittest) {
+		writeln("All unittests passed");
+		return;
+	}
+
 	import std.file;
 	import std.stdio;
 	import std.string;
 	import std.algorithm;
 	import std.array;
 	import core.memory;
+	import core.exception : OutOfMemoryError;
 
 	writeln("Loading images...");
 	auto imgdata = ImageSigDcRes.fromFile("test/cat_a1.jpg");
 	GC.disable();
-	foreach(i; 0..100_000) {
-		db.addImage(imgdata);
-		if(i > 0 && (i % 10_000) == 0)
-		{
-			writeln(i, " images loaded...");
+	try
+	{
+		foreach(i; 0..10_000_000) {
+			db.addImage(imgdata);
+			if(i > 0 && (i % 10_000) == 0)
+			{
+				writeln(i, " images loaded...");
 
-			GC.enable();
-			GC.collect();
-			GC.disable();
+				GC.enable();
+				GC.collect();
+				GC.disable();
+			}
 		}
 	}
-	GC.enable();
+	catch(OutOfMemoryError e)
+	{
+		GC.enable();
+		writeln("Ran out of memory! number of images loaded: ", db.numImages());
+	}
+
+	auto queryimage = ImageSigDcRes.fromFile("test/cat_a2.jpg");
+
+	//QueryParams query;
+	//query.in_image = &queryimage;
+	//query.num_results = 15;
+	//query.ignore_color = false;
+
+	//scope QueryResult[] result = MemDb.query(query);
+
 
 	writeln("Database has ", db.numImages(), " images.");
-
 	auto a = stdin.byLine().front;
 }
