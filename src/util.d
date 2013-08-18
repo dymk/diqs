@@ -8,7 +8,7 @@ module util;
 
 import types : coeff_t;
 import sig : CoeffIPair;
-import std.range : isInputRange, array;
+import std.range : isInputRange, array, zip, iota;
 import std.algorithm : map, sort;
 
 T min(T)(T a, T b)
@@ -21,13 +21,29 @@ T max(T)(T a, T b)
 	return (a > b) ? a : b;
 }
 
-CoeffIPair[] largestCoeffs(C)(C[] coeffs, int n, short skip_head_amt = 0)
+CoeffIPair[] largestCoeffs(C)(C[] coeffs, int num_coeffs, short skip_head_amt = 0)
 if(is(C : coeff_t))
 {
 	short i = skip_head_amt;
-	scope coeff_set = coeffs[i..$].map!(a => CoeffIPair(i++, a))().array();
+
+	version(DigitalMars)
+	{
+		// Workaround for DMD 2.063 bug
+		scope coeff_set =
+		  zip(
+		  	iota(i, cast(short)coeffs.length),
+		  	coeffs[i..$]).
+		  map!(a => CoeffIPair(a[0], a[1])).array();
+	}
+	else
+	{
+		// Ah, nice, fast, and consice.
+		scope coeff_set = coeffs[i..$].map!(a => CoeffIPair(i++, a))().array();
+	}
+
 	sort!("std.math.abs(a.coeff) > std.math.abs(b.coeff)")(coeff_set);
-	return coeff_set[0..n].array(); //.array because coeff_set is scope
+	return coeff_set[0..num_coeffs
+	].array(); //.array because coeff_set is scope
 }
 
 unittest {
