@@ -77,7 +77,10 @@ struct ImageSig
 struct ImageDc
 {
 	// DC coefficents (first component) of the haar decomposed image
-	dc_t y, i, q;
+	dc_t[NumColorChans] avgls;
+	ref auto y() @property { return avgls[0]; }
+	ref auto i() @property { return avgls[1]; }
+	ref auto q() @property { return avgls[2]; }
 }
 
 struct ImageRes
@@ -143,7 +146,9 @@ struct ImageSigDcRes
 		haar2d(ichan, ImageWidth, ImageHeight);
 		haar2d(qchan, ImageWidth, ImageHeight);
 
-		ret.dc = ImageDc(ychan[0], ichan[0], qchan[0]);
+		ret.dc.y = ychan[0];
+		ret.dc.i = ichan[0];
+		ret.dc.q = qchan[0];
 
 		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs, 1);
 		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs, 1);

@@ -106,6 +106,12 @@ final class BucketManager
 		return index;
 	}
 
+	Bucket* bucketForCoeff(coeffi_t coeff, int channel)
+	{
+		auto index_at = this.bucketIndexForCoeff(coeff);
+		return &this.m_buckets[channel][index_at];
+	}
+
 	auto length() { return _length; }
 
 private:

@@ -17,10 +17,10 @@ void main()
 
 	auto db = new MemDb();
 
-	version(unittest) {
-		writeln("All unittests passed");
-		return;
-	}
+	//version(unittest) {
+	//	writeln("All unittests passed");
+	//	return;
+	//}
 
 	import std.file;
 	import std.stdio;
@@ -31,38 +31,43 @@ void main()
 	import core.exception : OutOfMemoryError;
 
 	writeln("Loading images...");
-	auto imgdata = ImageSigDcRes.fromFile("test/cat_a1.jpg");
-	GC.disable();
-	try
-	{
-		foreach(i; 0..10_000_000) {
-			db.addImage(imgdata);
-			if(i > 0 && (i % 10_000) == 0)
-			{
-				writeln(i, " images loaded...");
+	auto img1 = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	auto img2 = ImageSigDcRes.fromFile("test/cat_a2.jpg");
 
-				GC.enable();
-				GC.collect();
-				GC.disable();
-			}
-		}
-	}
-	catch(OutOfMemoryError e)
-	{
-		GC.enable();
-		writeln("Ran out of memory! number of images loaded: ", db.numImages());
-	}
+	db.addImage(img1);
+	db.addImage(img2);
+	db.addImage(ImageSigDcRes.fromFile("test/ignore/random_search_1/images(7).jpg"));
 
-	auto queryimage = ImageSigDcRes.fromFile("test/cat_a2.jpg");
+	//GC.disable();
+	//try
+	//{
+	//	foreach(i; 0..10_000_000) {
+	//		db.addImage(imgdata);
+	//		if(i > 0 && (i % 10_000) == 0)
+	//		{
+	//			writeln(i, " images loaded...");
 
-	//QueryParams query;
-	//query.in_image = &queryimage;
-	//query.num_results = 15;
-	//query.ignore_color = false;
+	//			GC.enable();
+	//			GC.collect();
+	//			GC.disable();
+	//		}
+	//	}
+	//}
+	//catch(OutOfMemoryError e)
+	//{
+	//	GC.enable();
+	//	writeln("Ran out of memory! number of images loaded: ", db.numImages());
+	//}
 
-	//scope QueryResult[] result = MemDb.query(query);
+	auto queryimage = img2;
 
+	QueryParams query_params;
+	query_params.in_image = &queryimage;
+	query_params.num_results = 15;
+	query_params.ignore_color = false;
 
-	writeln("Database has ", db.numImages(), " images.");
-	auto a = stdin.byLine().front;
+	scope results = db.query(query_params);
+	writeln("Results: ", results);
+
+	//auto a = stdin.byLine().front;
 }

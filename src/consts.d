@@ -4,6 +4,10 @@ module consts;
  */
 
 import util : min, max;
+import types :
+  score_t;
+
+import std.math : lrint;
 
 /// Image constants
 enum short ImageHeight   = 128;
@@ -15,12 +19,17 @@ enum ubyte NumColorChans = 3;
 /// The number of coefficients that a signature represents
 enum NumSigCoeffs = 40;
 
+// Maximum score and score scaling values
+enum score_t ScoreScale = 20;
+enum score_t ScoreMax   = (1 << ScoreScale);
+
 /// Weights for coefficient buckets
-shared float[3][6][2] Weights = [
+/// Access like Weights[is_sketch ? 1 : 0][weight_bin][color_channel]
+static immutable shared float[3][6][2] WeightsBase = [
 	// For scanned picture (sketch=0):
 	[
 	//  Y       I       Q
-		[5.00f, 19.21f, 34.37f],
+		[5.00f, 19.21f, 34.37f], // First set is the DC coeff weights
 		[0.83f,  1.26f,  0.36f],
 		[1.01f,  0.44f,  0.45f],
 		[0.52f,  0.53f,  0.14f],
@@ -38,6 +47,21 @@ shared float[3][6][2] Weights = [
 		[0.32f,  0.07f,  0.38f]
 	]
 ];
+
+static immutable shared score_t[3][6][2] Weights = (() {
+	score_t[3][6][2] tmp;
+	foreach(a, first; WeightsBase)
+	{
+		foreach(b, second; first)
+		{
+			foreach(c, value; second)
+			{
+				tmp[a][b][c] = cast(score_t)(value * ScoreMax);
+			}
+		}
+	}
+	return tmp;
+})();
 
 /// Maps coefficient location to a weight bucket
 /// Initialized with a self executing lambda, a-la Javascript

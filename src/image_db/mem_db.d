@@ -16,6 +16,8 @@ import sig :
   ImageSig,
   ImageRes,
   ImageDc;
+import query :
+  QueryParams;
 
 import std.algorithm : min, max;
 import std.exception : enforce;
@@ -177,10 +179,10 @@ class MemDb : BaseDb
 
 	auto numImages() @property { return m_mem_imgs.length; }
 
-	//QueryResult[] query(QueryParams params)
-	//{
-	//	score_t[] scores = new score_t[this.length()];
-	//}
+	auto query(const QueryParams params)
+	{
+		return params.perform(m_manager, m_mem_imgs);
+	}
 
 private:
 	// Maps a user_id to its index in m_mem_imgs
