@@ -12,7 +12,20 @@ import std.algorithm : max;
 
 interface BaseDb
 {
-	bool addImage(in ImageIdSigDcRes);
+	/**
+	 * Inserts an image into the database. Returns the user ID  which is
+	 * now associated with that image. If insetion fails, the function
+	 * may throw.
+	 */
+	user_id_t addImage(in ImageIdSigDcRes);
+
+	/**
+	 * Removes an image with a given user ID from the database, returning
+	 * the image if it was removed, or null if it failed. It may throw if
+	 * the given ID wans't found in the database to begin with,
+	 * or if removal failed for some reason.
+	 */
+	ImageIdSigDcRes* removeImage(user_id_t);
 }
 
 class IdGen(T)

@@ -134,7 +134,11 @@ struct ImageSigDcRes
 		ret.res = ImageRes(width, height);
 
 		//enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.CubicFilter, 1.0));
-		enforce(wand.scaleImage(ImageWidth, ImageHeight));
+		if(width != ImageWidth || height != ImageHeight)
+		{
+			enforce(wand.scaleImage(ImageWidth, ImageHeight));
+		}
+
 		scope pixels = wand.exportImagePixelsFlat!YIQ();
 		enforce(pixels);
 

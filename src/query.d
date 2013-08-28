@@ -62,22 +62,24 @@ struct QueryParams
 			assert(false, "No B&W support... *yet*");
 		}
 
-		auto weights = WeightsBase[is_sketch ? 1 : 0];
+		auto weights = Weights[is_sketch ? 1 : 0];
 		immutable dc_weight_bin = 0;
 
 		foreach(index, ref img; db_images)
 		{
 			immutable ImageDc dc = img.dc;
 
-			int s = 0;
+			score_t s = 0;
 			foreach(chan; 0..NumColorChans)
 			{
-				s += cast(int)(weights[dc_weight_bin][chan] * abs(dc.avgls[chan] - query_dc.avgls[chan]));
+				score_t weight = cast(score_t)(weights[dc_weight_bin][chan]);
+
+				//s += (((DScore)weights[sketch][0][c]) * abs(itr.avgl()[c] - q.avgl[c])) >> ScoreScale;
+				s += (weight * cast(score_t)abs(dc.avgls[chan] - query_dc.avgls[chan])) >> ScoreScale;
+				//s += cast(int)(weights[dc_weight_bin][chan] * abs(dc.avgls[chan] - query_dc.avgls[chan]));
 			}
 			scores[index] = cast(score_t)s;
 		}
-
-		writeln("Scores after avgl calculation: ", scores);
 
 		foreach(chan; 0..NumColorChans)
 		{
@@ -122,17 +124,11 @@ struct QueryParams
 			return a.score < b.score;
 		});
 
-		writeln("Scale is: ", score_scale);
-
-		//writeln("Score max is ", ScoreMax);
 		//score_scale = -1 * cast(score_t) (score_scale / ScoreMax);
-		//writeln("Score scale is now: ", score_scale);
-
 
 		auto results = new QueryResult[num_results];
 		foreach(index, match; best_matches)
 		{
-			writeln("Adding image with score ", match.score);
 			float sim = (cast(float)match.score / cast(float)score_scale * 100.0);
 			results[index] = QueryResult(match.image, sim);
 		}

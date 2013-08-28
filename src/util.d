@@ -45,8 +45,7 @@ if(is(C : coeff_t))
 
 	sort!((a, b) => abs(a.coeff) > abs(b.coeff))(coeff_set);
 
-	return coeff_set[0..num_coeffs
-	].array(); //.array because coeff_set is scope
+	return coeff_set[0..num_coeffs].array(); //.array because coeff_set is scope
 }
 
 unittest {

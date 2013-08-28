@@ -4,7 +4,9 @@ module image_db.mem_db;
  * Represents an in memory, searchable database of images
  */
 
-import image_db.bucket_manager : BucketManager;
+import image_db.bucket_manager :
+  BucketManager,
+  BucketSizes;
 import image_db.base_db : BaseDb, IdGen;
 import types :
   user_id_t,
@@ -49,6 +51,12 @@ class MemDb : BaseDb
 		m_id_gen = new IdGen!user_id_t;
 	}
 
+	this(size_t size_hint)
+	{
+		m_mem_imgs.reserve(size_hint);
+		this();
+	}
+
 	/**
 	 * Determine if the database holds an image with that user ID
 	 * If it does, return a pointer to the image's information,
@@ -91,46 +99,50 @@ class MemDb : BaseDb
 		return user_id;
 	}
 
-	bool addImage(in ImageSigDcRes img, user_id_t user_id)
+	user_id_t addImage(in ImageSigDcRes img, user_id_t user_id)
 	{
-		auto idimg = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+		immutable idimg = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
 		return addImage(idimg);
 	}
 
-	bool addImage(in ImageIdSigDcRes img)
+	user_id_t addImage(in ImageIdSigDcRes img)
 	{
-		immutable user_id = img.user_id;
-		if(user_id in id_intern_map)
+			immutable user_id = img.user_id;
+			if(user_id in id_intern_map)
+			{
+				throw new AlreadyHaveIDException;
+			}
+
+		synchronized
 		{
-			throw new AlreadyHaveIDException;
+			m_id_gen.saw(user_id);
+
+			// Next ID is just the next available spot in the in-mem array
+			immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
+
+			m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
+			m_mem_imgs[intern_id] = StoredImage(user_id, img.dc, img.res);
+
+			id_intern_map[user_id] = intern_id;
+
+			m_manager.addSig(intern_id, img.sig);
+
+			// Arbitrary limit so the user can't have more than 4B
+			// images in the database (and they don't overflow
+			// internal IDs).
+			enforce(m_mem_imgs.length <= intern_id_t.max);
 		}
 
-		m_id_gen.saw(user_id);
-
-		// Next ID is just the next available spot in the in-mem array
-		immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
-
-		m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
-		m_mem_imgs[intern_id] = StoredImage(user_id, img.dc, img.res);
-
-		id_intern_map[user_id] = intern_id;
-
-		m_manager.addSig(intern_id, img.sig);
-
-		// Arbitrary limit so the user can't have more than 4B
-		// images in the database (and they don't overflow
-		// internal IDs).
-		enforce(m_mem_imgs.length <= intern_id_t.max);
-
-		return true;
+		return user_id;
 	}
 
 	/**
-	 * Removes an image
-	 * TODO: Figure out a better thing to return in this function
-	 * Should it return a pointer to the image somewhere in the heap?
+	 * Removes an image from the database, and returns the associated signature.
 	 */
-	ImageIdSigDcRes* removeImage(user_id_t user_id, bool throwOnDidntHave = true)
+	ImageIdSigDcRes* removeImage(user_id_t user_id) {
+		return removeImage(user_id, true);
+	}
+	ImageIdSigDcRes* removeImage(user_id_t user_id, bool throwOnDidntHave)
 	{
 		// Map to the internal ID
 		auto maybe_rm_id = user_id in id_intern_map;
@@ -177,11 +189,15 @@ class MemDb : BaseDb
 		return ret;
 	}
 
-	auto numImages() @property { return m_mem_imgs.length; }
+	size_t numImages() { return m_mem_imgs.length; }
 
 	auto query(const QueryParams params)
 	{
 		return params.perform(m_manager, m_mem_imgs);
+	}
+
+	auto bucketSizeHint(ref BucketSizes sizes) {
+		return m_manager.bucketSizeHint(sizes);
 	}
 
 private:

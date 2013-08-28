@@ -15,6 +15,10 @@ enum short ImageWidth    = 128;
 enum short ImageArea     = ImageHeight * ImageWidth;
 enum ubyte NumColorChans = 3;
 
+// The number of buckets held by the bucket manager per channel
+enum NumBucketsPerChan = (ImageArea * 2) - 1;
+enum NumBuckets = NumColorChans * NumBucketsPerChan;
+
 /// Signature configuration
 /// The number of coefficients that a signature represents
 enum NumSigCoeffs = 40;
