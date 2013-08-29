@@ -24,21 +24,6 @@ import query :
 import std.algorithm : min, max;
 import std.exception : enforce;
 
-// TODO: DRY up custom exceptions
-
-// Thrown when an image with an ID is inserted into the database, but
-// the database already has an image with that ID
-class AlreadyHaveIDException : Exception {
-	this(string msg = "ID Already inserted in database", string file = __FILE__, size_t line = __LINE__)
-	{ super(msg, file, line); }
-}
-
-// Thrown when an image that doesn't exist with a given ID is attempted to be retrieved or modified
-class IDNotFoundException : Exception {
-	this(string msg = "ID was not found in the database", string file = __FILE__, size_t line = __LINE__)
-	{ super(msg, file, line); }
-}
-
 class MemDb : BaseDb
 {
 	alias StoredImage = ImageIdDcRes;
@@ -81,7 +66,7 @@ class MemDb : BaseDb
 	{
 		auto img = has(id);
 		if(img is null && throwOnNotFound) {
-			throw new IDNotFoundException;
+			throw new BaseDb.IdNotFoundException(id);
 		}
 		return img;
 	}
@@ -110,7 +95,7 @@ class MemDb : BaseDb
 			immutable user_id = img.user_id;
 			if(user_id in id_intern_map)
 			{
-				throw new AlreadyHaveIDException;
+				throw new BaseDb.AlreadyHaveIdException(user_id);
 			}
 
 		synchronized
@@ -139,21 +124,13 @@ class MemDb : BaseDb
 	/**
 	 * Removes an image from the database, and returns the associated signature.
 	 */
-	ImageIdSigDcRes* removeImage(user_id_t user_id) {
-		return removeImage(user_id, true);
-	}
-	ImageIdSigDcRes* removeImage(user_id_t user_id, bool throwOnDidntHave)
+	ImageIdSigDcRes removeImage(user_id_t user_id)
 	{
 		// Map to the internal ID
 		auto maybe_rm_id = user_id in id_intern_map;
 		if(maybe_rm_id is null)
 		{
-			if(throwOnDidntHave) {
-				throw new IDNotFoundException;
-			}
-			else {
-				return null;
-			}
+			throw new BaseDb.IdNotFoundException(user_id);
 		}
 
 		immutable auto rm_intern_id = *maybe_rm_id;
@@ -161,7 +138,7 @@ class MemDb : BaseDb
 
 		ImageSig sig = m_manager.removeId(rm_intern_id);
 
-		auto ret = new ImageIdSigDcRes;
+		ImageIdSigDcRes ret;
 		ret.sig = sig;
 		ret.dc = rm_image.dc;
 		ret.res = rm_image.res;
@@ -196,7 +173,7 @@ class MemDb : BaseDb
 		return params.perform(m_manager, m_mem_imgs);
 	}
 
-	auto bucketSizeHint(ref BucketSizes sizes) {
+	auto bucketSizeHint(BucketSizes* sizes) {
 		return m_manager.bucketSizeHint(sizes);
 	}
 
@@ -246,11 +223,11 @@ unittest {
 	try {
 		db.addImage(img, 0);
 	}
-	catch(AlreadyHaveIDException e)
+	catch(BaseDb.AlreadyHaveIdException e)
 	{
 		thrown = true;
 	}
-	assert(thrown, "AlreadyHaveIDException wasn't thrown");
+	assert(thrown, "BaseDb.AlreadyHaveIdException wasn't thrown");
 }
 
 unittest {
@@ -273,7 +250,7 @@ unittest {
 unittest {
 	auto db = new MemDb();
 	auto id = db.addImage(img);
-	assert((*db.removeImage(id)).sig.sameAs(img.sig));
+	assert((db.removeImage(id)).sig.sameAs(img.sig));
 }
 
 unittest {
@@ -283,7 +260,7 @@ unittest {
 	{
 		db.removeImage(0);
 	}
-	catch(IDNotFoundException e)
+	catch(BaseDb.IdNotFoundException e)
 	{
 		thrown = true;
 	}
@@ -292,8 +269,13 @@ unittest {
 
 unittest {
 	auto db = new MemDb;
-	auto ret = db.removeImage(0, false);
-	assert(ret is null);
+	bool thrown = false;
+	try {
+		db.removeImage(0);
+	} catch (BaseDb.IdNotFoundException e) {
+		thrown = true;
+	}
+	assert(thrown);
 }
 
 unittest {

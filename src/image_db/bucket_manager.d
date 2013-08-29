@@ -105,7 +105,7 @@ final class BucketManager
 		return m_buckets;
 	}
 
-	auto bucketSizeHint(ref BucketSizes bucket_sizes) {
+	auto bucketSizeHint(BucketSizes* bucket_sizes) {
 		foreach(ubyte chan; 0..NumColorChans)
 		{
 			auto chan_sizes = bucket_sizes.forChan(chan);

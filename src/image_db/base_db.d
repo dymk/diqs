@@ -8,10 +8,23 @@ import types : user_id_t, coeffi_t;
 import sig : ImageIdSigDcRes;
 import consts : ImageArea, NumColorChans;
 
+import std.conv : to;
 import std.algorithm : max;
 
 interface BaseDb
 {
+	static class BaseDbException : Exception {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class IdNotFoundException : BaseDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " not found in the database", file, line, next); }
+	};
+	static final class AlreadyHaveIdException : BaseDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " is already in the database", file, line, next); }
+	};
+
 	/**
 	 * Inserts an image into the database. Returns the user ID  which is
 	 * now associated with that image. If insetion fails, the function
@@ -25,7 +38,7 @@ interface BaseDb
 	 * the given ID wans't found in the database to begin with,
 	 * or if removal failed for some reason.
 	 */
-	ImageIdSigDcRes* removeImage(user_id_t);
+	ImageIdSigDcRes removeImage(user_id_t);
 }
 
 class IdGen(T)

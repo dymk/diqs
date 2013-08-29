@@ -54,7 +54,7 @@ struct ImageSig
 	ref auto i() @property { return sigs[1]; }
 	ref auto q() @property { return sigs[2]; }
 
-	version(unittest)
+	version(assert)
 	{
 		import std.algorithm : sort;
 
@@ -187,4 +187,14 @@ struct ImageIdSigDcRes
 	ImageSig sig;
 	ImageDc dc;
 	ImageRes res;
+
+	version(assert) {
+		bool sameAs(ImageIdSigDcRes other) const {
+			return (
+				other.user_id == this.user_id &&
+				other.dc == this.dc &&
+				other.res == this.res &&
+				other.sig.sameAs(this.sig));
+		}
+	}
 }
