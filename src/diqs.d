@@ -83,11 +83,15 @@ void main()
 
 void loadDirectory(BaseDb db, string dir)
 {
+	auto gen = new IdGen!user_id_t;
 	foreach(name; dirEntries(dir, SpanMode.breadth)) {
+		auto id = gen.next();
 		auto img = ImageSigDcRes.fromFile(name);
-		user_id_t user_id = db.addImage(img);
+		auto imgWithId = ImageIdSigDcRes(id, img.sig, img.dc, img.res);
 
-		stderr.writeln(user_id, ":", name);
+		db.addImage(imgWithId);
+
+		stderr.writeln(id, ":", name);
 	}
 
 	writeln("Loaded ", db.numImages(), " images.");

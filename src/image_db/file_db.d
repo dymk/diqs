@@ -54,13 +54,6 @@ class FileDb : BaseDb
 		}
 	}
 
-	user_id_t addImage(in ImageSigDcRes img) {
-		user_id_t user_id = m_mem_db.addImage(img);
-		ImageIdSigDcRes img_sig = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
-		queueAddJob(img_sig);
-		return user_id;
-	}
-
 	user_id_t addImage(in ImageIdSigDcRes img) {
 		auto ret = m_mem_db.addImage(img);
 		queueAddJob(img);
@@ -81,7 +74,29 @@ class FileDb : BaseDb
 		auto ret2 =      m_mem_db.removeImage(id);
 
 		version(unittest) {
-			assert(ret1.sameAs(ret2));
+			if(!ret1.sameAs(ret2)) {
+				writeln("PLayer and MemDB returned different signatures; oops!");
+				writeln("PLayer returned: ");
+				writeln(ret1);
+				writeln("MemDB returned: ");
+				writeln(ret2);
+
+				writeln("IDs (same: ", ret1.user_id == ret2.user_id, ")");
+
+				writeln("DCs (same: ", ret1.dc == ret2.dc, ")");
+				writeln(ret1.dc);
+				writeln(ret2.dc);
+
+				writeln("Resolutions: (same: ", ret1.res == ret2.res, ")");
+				writeln(ret1.res);
+				writeln(ret2.res);
+
+				writeln("Sigs (same: ", ret1.sig.sameAs(ret2.sig), ")");
+				//writeln(ret1.sig);
+				//writeln(ret2.sig);
+
+				assert(false);
+			}
 		}
 
 		return ret1;
@@ -119,23 +134,9 @@ version(unittest)
 	import std.stdio;
 	import std.file : remove;
 
+	import sig : imageFromFile;
+
 	static string tmp_db_path = "test/tmp_db_path.db";
-
-
-	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
-		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
-		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
-		return img;
-	}
-}
-
-unittest {
-	scope(exit) { remove(tmp_db_path); }
-	scope f = FileDb.fromFile(tmp_db_path, true);
-	auto i = ImageSigDcRes.fromFile("test/cat_a1.jpg");
-	assert(f.numImages() == 0);
-	f.addImage(i);
-	assert(f.numImages() == 1);
 }
 
 unittest {
@@ -147,11 +148,12 @@ unittest {
 	f.addImage(img1);
 	f.addImage(img2);
 	f.save();
+	assert(f.numImages() == 2);
 
 	auto ret = f.removeImage(0);
 	assert(ret == img1);
 
-	assert(f.numImages() == 0);
+	assert(f.numImages() == 1);
 }
 
 unittest {
@@ -172,8 +174,8 @@ unittest {
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 	auto img2 = imageFromFile(1, "test/cat_a2.jpg");
 
-	f.appendImage(img1);
-	f.appendImage(img2);
+	f.addImage(img1);
+	f.addImage(img2);
 
 	bool thrown = false;
 	try {
@@ -195,9 +197,9 @@ unittest {
 
 	{
 		scope f = FileDb.fromFile(tmp_db_path, true);
-		f.appendImage(img1);
-		f.appendImage(img2);
-		f.appendImage(img3);
+		f.addImage(img1);
+		f.addImage(img2);
+		f.addImage(img3);
 	}
 
 	{
@@ -215,9 +217,9 @@ unittest {
 
 	{
 		scope f = FileDb.fromFile(tmp_db_path, true);
-		f.appendImage(img1);
-		f.appendImage(img2);
-		f.appendImage(img3);
+		f.addImage(img1);
+		f.addImage(img2);
+		f.addImage(img3);
 	}
 
 	{
@@ -227,7 +229,7 @@ unittest {
 
 	{
 		scope f = FileDb.fromFile(tmp_db_path);
-		assert(equal(f.imageDataIterator(), [img1, img2]));
+		assert(equal(f.imageDataIterator(), [img1, img3]));
 	}
 
 }
