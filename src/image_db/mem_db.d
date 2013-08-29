@@ -7,7 +7,7 @@ module image_db.mem_db;
 import image_db.bucket_manager :
   BucketManager,
   BucketSizes;
-import image_db.base_db : BaseDb, IdGen;
+import image_db.base_db : BaseDb;
 import types :
   user_id_t,
   intern_id_t;
@@ -33,7 +33,6 @@ class MemDb : BaseDb
 	{
 		//m_user_mem_ids_map = new UserInternMap();
 		m_manager = new BucketManager();
-		m_id_gen = new IdGen!user_id_t;
 	}
 
 	this(size_t size_hint)
@@ -62,13 +61,13 @@ class MemDb : BaseDb
 	 * and the image isn't found in the database. Else returns null, or
 	 * a pointer to the image's data.
 	 */
-	const StoredImage* get(user_id_t id, bool throwOnNotFound = true)
+	StoredImage getImage(user_id_t id)
 	{
 		auto img = has(id);
-		if(img is null && throwOnNotFound) {
+		if(img is null) {
 			throw new BaseDb.IdNotFoundException(id);
 		}
-		return img;
+		return *img;
 	}
 
 	/**
@@ -77,31 +76,16 @@ class MemDb : BaseDb
 	 * or explicitly specify the ID they'd like to refer to the
 	 * image with.
 	 */
-	user_id_t addImage(in ImageSigDcRes img)
-	{
-		user_id_t user_id = m_id_gen.next();
-		addImage(img, user_id);
-		return user_id;
-	}
-
-	user_id_t addImage(in ImageSigDcRes img, user_id_t user_id)
-	{
-		immutable idimg = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
-		return addImage(idimg);
-	}
 
 	user_id_t addImage(in ImageIdSigDcRes img)
 	{
-			immutable user_id = img.user_id;
+		immutable user_id = img.user_id;
+		synchronized
+		{
 			if(user_id in id_intern_map)
 			{
 				throw new BaseDb.AlreadyHaveIdException(user_id);
 			}
-
-		synchronized
-		{
-			m_id_gen.saw(user_id);
-
 			// Next ID is just the next available spot in the in-mem array
 			immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
 
@@ -138,10 +122,6 @@ class MemDb : BaseDb
 
 		ImageSig sig = m_manager.removeId(rm_intern_id);
 
-		ImageIdSigDcRes ret;
-		ret.sig = sig;
-		ret.dc = rm_image.dc;
-		ret.res = rm_image.res;
 
 		id_intern_map.remove(user_id);
 
@@ -163,7 +143,7 @@ class MemDb : BaseDb
 
 		m_mem_imgs.length--;
 
-		return ret;
+		return ImageIdSigDcRes(user_id, sig, rm_image.dc, rm_image.res);
 	}
 
 	uint numImages() { return cast(uint) m_mem_imgs.length; }
@@ -186,42 +166,43 @@ private:
 	scope intern_id_t[user_id_t] id_intern_map;
 
 	scope BucketManager m_manager;
-
-	scope IdGen!user_id_t m_id_gen;
 }
 
 version(unittest)
 {
-	static immutable ImageSigDcRes img;
-	static immutable ImageSigDcRes img2;
+	import sig : imageFromFile;
+
+	static immutable ImageIdSigDcRes img1;
+	static immutable ImageIdSigDcRes img2;
 	static this() {
-		img = ImageSigDcRes.fromFile("test/cat_a1.jpg");
-		img2 = ImageSigDcRes.fromFile("test/cat_a2.jpg");
+		img1 = imageFromFile(1, "test/cat_a1.jpg");
+		img2 = imageFromFile(2, "test/small_png.png");
 	}
 }
 
 unittest {
-	assert(img.sig.sameAs(img2.sig) == false);
-	assert(img.dc != img2.dc);
-	assert(img.res != img2.res);
+	// Make sure our test data is of differnet images
+	assert(img1.sig.sameAs(img2.sig) == false);
+	assert(img1.dc != img2.dc);
+	assert(img1.res != img2.res);
 }
 
 unittest {
 	auto db = new MemDb();
 	assert(db.numImages() == 0);
 
-	db.addImage(img);
+	db.addImage(img1);
 
 	assert(db.numImages() == 1);
 }
 
 unittest {
 	auto db = new MemDb();
-	db.addImage(img, 0);
+	db.addImage(img1);
 
 	bool thrown = false;
 	try {
-		db.addImage(img, 0);
+		db.addImage(img1);
 	}
 	catch(BaseDb.AlreadyHaveIdException e)
 	{
@@ -232,89 +213,59 @@ unittest {
 
 unittest {
 	auto db = new MemDb();
-	db.addImage(img, 0);
+	db.addImage(img1);
 
-	bool thrown = false;
-	assert(db.get(1, false) is null);
-}
-
-unittest {
-	auto db = new MemDb();
-	auto id = db.addImage(img);
-	// This doesn't actually need to pass; the
-	// unittest is here to show that addImage
-	// without an ID returns all the image data.
-	assert(id == 0);
-}
-
-unittest {
-	auto db = new MemDb();
-	auto id = db.addImage(img);
-	assert((db.removeImage(id)).sig.sameAs(img.sig));
-}
-
-unittest {
-	auto db = new MemDb();
-	bool thrown = false;
-	try
-	{
-		db.removeImage(0);
-	}
-	catch(BaseDb.IdNotFoundException e)
-	{
-		thrown = true;
-	}
-	assert(thrown);
-}
-
-unittest {
-	auto db = new MemDb;
 	bool thrown = false;
 	try {
-		db.removeImage(0);
-	} catch (BaseDb.IdNotFoundException e) {
+		db.getImage(123);
+	} catch(BaseDb.IdNotFoundException e) {
 		thrown = true;
 	}
 	assert(thrown);
 }
 
 unittest {
+	auto db = new MemDb();
+	auto id = db.addImage(img1);
+	assert((db.removeImage(id)).sig.sameAs(img1.sig));
+}
+
+unittest {
 	auto db = new MemDb;
 
-	auto id = db.addImage(img);
+	assert(db.has(0) is null);
+
+	auto id = db.addImage(img1);
 	db.removeImage(id);
 
-	assert(db.has(id) == null);
+	assert(db.has(id) is null);
 	assert(db.numImages() == 0);
 }
 
 unittest {
 	auto db = new MemDb;
-	auto id = db.addImage(img);
-	assert(id == db.get(id).user_id);
+	auto id = db.addImage(img1);
+	assert(id == db.getImage(id).user_id);
 }
 
 unittest {
 	auto db = new MemDb;
-	auto id = 897654;
-	db.addImage(img, id);
-	assert(id == db.get(id).user_id);
+	auto id = db.addImage(img1);
+	assert(id == db.getImage(id).user_id);
 }
 
 unittest {
 	auto db = new MemDb;
-	auto id1 = 32817;
-	db.addImage(img, id1);
-	auto id2 = 857436;
-	db.addImage(img2, id2);
+	auto id1 = db.addImage(img1);
+	auto id2 = db.addImage(img2);
 
 	assert(db.numImages() == 2);
 
-	assert(db.get(id1).dc == img.dc);
-	assert(db.get(id1).res == img.res);
+	assert(db.getImage(id1).dc == img1.dc);
+	assert(db.getImage(id1).res == img1.res);
 
-	assert(db.get(id2).dc == img2.dc);
-	assert(db.get(id2).res == img2.res);
+	assert(db.getImage(id2).dc == img2.dc);
+	assert(db.getImage(id2).res == img2.res);
 
 	assert(db.has(id1));
 	assert(db.has(id2));
@@ -323,9 +274,9 @@ unittest {
 	assert(db.numImages() == 1);
 
 	// Verify the right image is returned from remove
-	assert(rm_img1.sig.sameAs(img.sig));
-	assert(rm_img1.dc == img.dc);
-	assert(rm_img1.res == img.res);
+	assert(rm_img1.sig.sameAs(img1.sig));
+	assert(rm_img1.dc == img1.dc);
+	assert(rm_img1.res == img1.res);
 
 	assert(!db.has(id1));
 	assert(db.has(id2));
@@ -337,6 +288,11 @@ unittest {
 	assert(rm_img2.sig.sameAs(img2.sig));
 	assert(rm_img2.dc == img2.dc);
 	assert(rm_img2.res == img2.res);
+}
 
-	import std.stdio;
+unittest {
+	auto db = new MemDb();
+	db.addImage(img1);
+	auto rm = db.removeImage(img1.user_id);
+	assert(rm.sameAs(img1));
 }
