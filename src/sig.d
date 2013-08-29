@@ -53,12 +53,34 @@ struct ImageSig
 	ref auto y() @property { return sigs[0]; }
 	ref auto i() @property { return sigs[1]; }
 	ref auto q() @property { return sigs[2]; }
+
+	version(assert)
+	{
+		import std.algorithm : sort;
+
+		bool sameAs(in ImageSig other) const
+		{
+			ImageSig o_dup = other;
+			ImageSig t_dup = this;
+
+			foreach(i; 0..NumColorChans)
+			{
+				o_dup.sigs[i][].sort();
+				t_dup.sigs[i][].sort();
+			}
+
+			return o_dup == t_dup;
+		}
+	}
 }
 
 struct ImageDc
 {
 	// DC coefficents (first component) of the haar decomposed image
-	dc_t y, i, q;
+	dc_t[NumColorChans] avgls;
+	ref auto y() @property { return avgls[0]; }
+	ref auto i() @property { return avgls[1]; }
+	ref auto q() @property { return avgls[2]; }
 }
 
 struct ImageRes
@@ -68,6 +90,13 @@ struct ImageRes
 
 struct ImageDcRes
 {
+	ImageDc dc;
+	ImageRes res;
+}
+
+struct ImageIdDcRes
+{
+	user_id_t user_id;
 	ImageDc dc;
 	ImageRes res;
 }
@@ -105,7 +134,11 @@ struct ImageSigDcRes
 		ret.res = ImageRes(width, height);
 
 		//enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.CubicFilter, 1.0));
-		enforce(wand.scaleImage(ImageWidth, ImageHeight));
+		if(width != ImageWidth || height != ImageHeight)
+		{
+			enforce(wand.scaleImage(ImageWidth, ImageHeight));
+		}
+
 		scope pixels = wand.exportImagePixelsFlat!YIQ();
 		enforce(pixels);
 
@@ -117,7 +150,9 @@ struct ImageSigDcRes
 		haar2d(ichan, ImageWidth, ImageHeight);
 		haar2d(qchan, ImageWidth, ImageHeight);
 
-		ret.dc = ImageDc(ychan[0], ichan[0], qchan[0]);
+		ret.dc.y = ychan[0];
+		ret.dc.i = ichan[0];
+		ret.dc.q = qchan[0];
 
 		scope ylargest = largestCoeffs(ychan[], NumSigCoeffs, 1);
 		scope ilargest = largestCoeffs(ichan[], NumSigCoeffs, 1);
@@ -126,9 +161,10 @@ struct ImageSigDcRes
 		auto sig = ImageSig();
 		// Add 1 to all of the indexes, because largestCoeff was passed the tail of
 		// the channel, so all coeffs' indexes were shifted left.
-		ylargest.map!(a => a.index)().copy(sig.y[]);
-		ilargest.map!(a => a.index)().copy(sig.i[]);
-		qlargest.map!(a => a.index)().copy(sig.q[]);
+		// If coeff is negative, make the index negative as well.
+		ylargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.y[]);
+		ilargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.i[]);
+		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
 		ret.sig = sig;
 
 		return ret;
@@ -151,4 +187,14 @@ struct ImageIdSigDcRes
 	ImageSig sig;
 	ImageDc dc;
 	ImageRes res;
+
+	version(assert) {
+		bool sameAs(ImageIdSigDcRes other) const {
+			return (
+				other.user_id == this.user_id &&
+				other.dc == this.dc &&
+				other.res == this.res &&
+				other.sig.sameAs(this.sig));
+		}
+	}
 }

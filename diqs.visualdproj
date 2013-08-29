@@ -286,9 +286,9 @@
   <obj>0</obj>
   <link>0</link>
   <lib>0</lib>
-  <subsystem>0</subsystem>
+  <subsystem>1</subsystem>
   <multiobj>0</multiobj>
-  <singleFileCompilation>0</singleFileCompilation>
+  <singleFileCompilation>1</singleFileCompilation>
   <oneobj>0</oneobj>
   <trace>0</trace>
   <quiet>0</quiet>
@@ -324,7 +324,7 @@
   <pic>0</pic>
   <cov>0</cov>
   <nofloat>0</nofloat>
-  <Dversion>2.043</Dversion>
+  <Dversion>2</Dversion>
   <ignoreUnsupportedPragmas>0</ignoreUnsupportedPragmas>
   <compiler>0</compiler>
   <otherDMD>0</otherDMD>
@@ -514,7 +514,7 @@
   <nofloat>0</nofloat>
   <Dversion>2</Dversion>
   <ignoreUnsupportedPragmas>0</ignoreUnsupportedPragmas>
-  <compiler>0</compiler>
+  <compiler>2</compiler>
   <otherDMD>0</otherDMD>
   <program>$(DMDInstallDir)windows\bin\dmd.exe</program>
   <imppath />
@@ -566,13 +566,18 @@
  </Config>
  <Folder name="diqs">
   <Folder name="src">
+   <Folder name="persistance_layer">
+    <File path="src\persistance_layer\file_helpers.d" />
+    <File path="src\persistance_layer\mysql_persistance.d" />
+    <File path="src\persistance_layer\on_disk_persistance.d" />
+    <File path="src\persistance_layer\persistance_layer.d" />
+   </Folder>
    <Folder name="image_db">
     <File path="src\image_db\all.d" />
     <File path="src\image_db\base_db.d" />
     <File path="src\image_db\bucket.d" />
     <File path="src\image_db\bucket_manager.d" />
     <File path="src\image_db\file_db.d" />
-    <File path="src\image_db\id_set.d" />
     <File path="src\image_db\mem_db.d" />
     <File path="src\reserved_array.d" />
    </Folder>
@@ -584,8 +589,10 @@
     <File path="src\magick_wand\wand.d" />
    </Folder>
    <File path="src\consts.d" />
+   <File path="src\delta_queue.d" />
    <File path="src\diqs.d" />
    <File path="src\haar.d" />
+   <File path="src\query.d" />
    <File path="src\sig.d" />
    <File path="src\types.d" />
    <File path="src\util.d" />

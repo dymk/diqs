@@ -5,14 +5,54 @@ module image_db.base_db;
  */
 
 import types : user_id_t, coeffi_t;
-import sig : ImageIdSigDcRes;
+import sig :
+  ImageIdSigDcRes,
+  ImageSigDcRes;
 import consts : ImageArea, NumColorChans;
 
+import std.conv : to;
 import std.algorithm : max;
 
 interface BaseDb
 {
-	bool addImage(in ImageIdSigDcRes);
+	static class BaseDbException : Exception {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class IdNotFoundException : BaseDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " not found in the database", file, line, next); }
+	};
+	static final class AlreadyHaveIdException : BaseDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " is already in the database", file, line, next); }
+	};
+
+	/**
+	 * Inserts an image into the database. Returns the user ID  which is
+	 * now associated with that image. If insetion fails, the function
+	 * may throw.
+	 */
+	user_id_t addImage(in ImageIdSigDcRes);
+
+	/**
+	 * This version does the same as the previous, but the database
+	 * implementation will decide on the user_id to assign to the
+	 * image.
+	 */
+	user_id_t addImage(in ImageSigDcRes);
+
+	/**
+	 * Removes an image with a given user ID from the database, returning
+	 * the image if it was removed, or null if it failed. It may throw if
+	 * the given ID wans't found in the database to begin with,
+	 * or if removal failed for some reason.
+	 */
+	ImageIdSigDcRes removeImage(user_id_t);
+
+	/**
+	 * Returns the number of images in the database.
+	 */
+	uint numImages();
 }
 
 class IdGen(T)

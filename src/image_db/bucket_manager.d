@@ -5,17 +5,47 @@ module image_db.bucket_manager;
  */
 
 import image_db.bucket;
-import types : coeffi_t, chan_t, intern_id_t;
+import types :
+  coeffi_t,
+  chan_t,
+  intern_id_t;
 import sig : ImageSig;
-import consts: NumColorChans, ImageArea;
+import consts :
+  ImageArea,
+  NumBuckets,
+  NumSigCoeffs,
+  NumColorChans,
+  NumBucketsPerChan;
+
+import std.exception : enforce;
+import std.conv : to;
+
+// A wrapper struct for easy passing and manipulation of bucket sizes.
+struct BucketSizes {
+	int[NumBuckets] sizes;
+
+	int[] Y() { return forChan(0); }
+	int[] I() { return forChan(1); }
+	int[] Q() { return forChan(2); }
+
+	int[] forChan(ubyte chan) {
+		return sizes[(chan * NumBucketsPerChan) .. ((chan+1) * NumBucketsPerChan)];
+	}
+}
+
+unittest {
+	BucketSizes bs;
+	bs.Y()[0] = 12;
+	assert(bs.Y().length == NumBucketsPerChan);
+	assert(bs.sizes[0] == 12);
+}
 
 final class BucketManager
 {
 	this() {
-		auto chan_length = (ImageArea*2)-1;
 		foreach(ref chan; m_buckets)
 		{
-			chan = new Bucket[chan_length];
+			chan = new Bucket[NumBucketsPerChan];
 		}
 	}
 
@@ -29,6 +59,40 @@ final class BucketManager
 				bucketForCoeff(coeff, chan).push(id);
 			}
 		}
+		this._length++;
+	}
+
+	// Simple wrapper function to move 'from' to 'to'
+	void moveId(const intern_id_t from, const intern_id_t to)
+	{
+		auto rm_sig = removeId(from);
+		addSig(to, rm_sig);
+	}
+
+	// Removes an ID from the bucket set, and
+	// returns the resulting signature that would
+	// have been used to insert it in the first place.
+	ImageSig removeId(intern_id_t intern_id)
+	{
+		ImageSig ret;
+
+		// Itterate over each channel of the image
+		foreach(chan; 0..NumColorChans)
+		{
+			// Store the buckets that the image's ID was in
+			int found = 0;
+			foreach(short i, ref bucket; m_buckets[chan])
+			{
+				if(bucket.remove(intern_id))
+				{
+					ret.sigs[chan][found] = coeffForBucketIndex(i);
+					found++;
+				}
+			}
+			enforce(found == NumSigCoeffs, "Image with internal ID " ~ to!string(intern_id) ~ " didn't have enough coeffs (found: " ~ to!string(found) ~ ")");
+		}
+		this._length--;
+		return ret;
 	}
 
 	ref Bucket bucketForCoeff(coeffi_t coeff, chan_t chan)
@@ -41,7 +105,19 @@ final class BucketManager
 		return m_buckets;
 	}
 
-	static short bucketIndexForCoeff(coeffi_t coeff)
+	auto bucketSizeHint(BucketSizes* bucket_sizes) {
+		foreach(ubyte chan; 0..NumColorChans)
+		{
+			auto chan_sizes = bucket_sizes.forChan(chan);
+			foreach(ushort index, uint bucket_size; chan_sizes)
+			{
+				auto bucket = bucketForCoeff(coeffForBucketIndex(index), chan);
+				bucket.sizeHint(bucket_size);
+			}
+		}
+	}
+
+	static ushort bucketIndexForCoeff(coeffi_t coeff)
 	{
 		assert(coeff != 0, "Coeff at 0 is a DC component; not a sig coeff");
 		// Because there is no 0 bucket, shift
@@ -55,7 +131,7 @@ final class BucketManager
 	/// Inverse of bucketIndexForCoeff
 	/// Convert a bucket's index to a coefficient
 	/// EG 0 => -16384
-	static coeffi_t coeffForBucketIndex(short index)
+	static coeffi_t coeffForBucketIndex(ushort index)
 	{
 		if(index >= ImageArea)
 			index++;
@@ -63,13 +139,31 @@ final class BucketManager
 		return index;
 	}
 
+	Bucket* bucketForCoeff(coeffi_t coeff, int channel)
+	{
+		auto index_at = this.bucketIndexForCoeff(coeff);
+		return &this.m_buckets[channel][index_at];
+	}
+
+	auto length() { return _length; }
+
 private:
+	size_t _length;
 	Bucket[][NumColorChans] m_buckets;
 }
 
 unittest {
 	auto f = new BucketManager();
 	assert(f.buckets().length);
+}
+
+version(unittest)
+{
+	import sig : ImageSigDcRes;
+	static immutable ImageSig sig;
+	static this() {
+		sig = ImageSigDcRes.fromFile("test/cat_a1.jpg").sig;
+	}
 }
 
 unittest {
@@ -88,4 +182,37 @@ unittest {
 	assert(f.coeffForBucketIndex(16383)  == -1);
 	assert(f.coeffForBucketIndex(16384)  == 1);
 	assert(f.coeffForBucketIndex(32767)  == 16384);
+}
+
+unittest {
+	auto f = new BucketManager();
+	assert(f.length == 0);
+}
+
+unittest {
+	auto f = new BucketManager();
+	f.addSig(1, sig);
+	assert(f.length == 1);
+}
+
+unittest {
+	auto f = new BucketManager();
+	f.addSig(1, sig);
+	f.removeId(1);
+	assert(f.length == 0);
+}
+
+unittest {
+	auto f = new BucketManager();
+	f.addSig(1, sig);
+	auto ret = f.removeId(1);
+	assert(ret.sameAs(sig));
+}
+
+unittest {
+	auto f = new BucketManager();
+	f.addSig(1, sig);
+	f.moveId(1, 2);
+	auto ret = f.removeId(2);
+	assert(ret.sameAs(sig));
 }

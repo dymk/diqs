@@ -1,195 +1,233 @@
-//module image_db.file_db;
+module image_db.file_db;
 
-///**
-// * Represents an image database that can syncronize with the disk.
-// */
+/**
+ * Represents an image database that can syncronize with the disk.
+ */
 
-//import std.stdio : File, ErrnoException;
-//import std.typecons : Tuple;
-//import std.exception : enforce;
+import std.typecons : Tuple;
+import std.exception : enforce;
+import std.container : Array;
+import std.file : exists;
+import core.memory : GC;
 
-//import types :
-//	user_id_t,
-//	intern_id_t,
-//	coeffi_t,
-//	chan_t;
+import types :
+  user_id_t,
+  intern_id_t,
+  coeffi_t,
+  chan_t;
 
-//import sig :
-//	ImageData,
-//	ImageRes,
-//	ImageDC,
-//	IDImageData;
+import sig :
+  ImageIdSigDcRes,
+  ImageSigDcRes,
+  ImageRes,
+  ImageDc;
 
-//import image_db : BaseDb, Bucket;
-//import consts : ImageArea, NumColorChans;
+import image_db.base_db : BaseDb;
+import image_db.mem_db : MemDb;
+import consts :
+  ImageArea,
+  NumColorChans,
+  NumBuckets;
 
-//import dcollections.HashMap : HashMap;
+import query :
+  QueryParams;
 
-///**
-// * Database structure:
-// * where N is the number of images in the database
-// * - type     (bytes) |    name    |    description
-// * - size_t       (4) | num_images | Number of images (N) in the database
-// * - IDImageData      |
-// */
+import persistance_layer.persistance_layer : PersistanceLayer;
+import persistance_layer.on_disk_persistance : OnDiskPersistance;
 
-//class FileDB : BaseDb
-//{
-//	alias UserInternMap = HashMap!(user_id_t, intern_id_t);
+class FileDb : BaseDb
+{
 
-//	struct IDImageSansSig
-//	{
-//		user_id_t user_id;
-//		ImageDC dc;
-//		ImageRes res;
-//	}
+	static FileDb fromFile(string path, bool create_if_nonexistant = false)
+	{
+		return new FileDb(OnDiskPersistance.fromFile(path, create_if_nonexistant));
+	}
 
-//	/// Loads the database from the file in db_path
-//	this(string db_path)
-//	{
-//		m_user_mem_ids_map = new UserInternMap;
-//		m_user_file_ids_map = new UserInternMap;
+	this(PersistanceLayer persist_layer) {
+		this.persist_layer = persist_layer;
+		this.m_mem_db = new MemDb(this.persist_layer.length);
 
-//		m_db_path = db_path;
+		m_mem_db.bucketSizeHint(persist_layer.bucketSizes());
 
-//		// Initialize buckets with the correct coeffs
-//		foreach(chan; 0..NumColorChans) {
-//			foreach(short b_index; 0..m_buckets[chan].length) {
-//				auto coeff = coeffForBucketIndex(b_index);
-//				m_buckets[chan][b_index] = Bucket(coeff);
-//			}
-//		}
-//	}
+		foreach(ref image; persist_layer.imageDataIterator()) {
+			m_mem_db.addImage(image);
+		}
+	}
 
-//	bool load()
-//	{
-//		m_db_handle = File(m_db_path, "r");
-//		throw new Exception("not implemented");
-//		//return true;
-//	}
+	user_id_t addImage(in ImageSigDcRes img) {
+		user_id_t user_id = m_mem_db.addImage(img);
+		ImageIdSigDcRes img_sig = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+		queueAddJob(img_sig);
+		return user_id;
+	}
 
-//	bool save()
-//	{
-//		throw new Exception("not implemented");
-//	}
+	user_id_t addImage(in ImageIdSigDcRes img) {
+		auto ret = m_mem_db.addImage(img);
+		queueAddJob(img);
+		return ret;
+	}
 
-//	override IDImageData addImage(ImageData imgdata)
-//	{
-//		user_id_t user_id = nextUserId();
-//		auto sig = imgdata.sig;
-//		auto dc = imgdata.dc;
-//		auto res = imgdata.res;
+	uint numImages() {
+		version(unittest) {
+			if(!persist_layer.dirty) {
+				assert(m_mem_db.numImages() == persist_layer.length);
+			}
+		}
+		return m_mem_db.numImages();
+	}
 
-//		immutable img = IDImageData(user_id, sig, dc, res);
+	ImageIdSigDcRes removeImage(user_id_t id) {
+		auto ret1 = persist_layer.removeImage(id);
+		auto ret2 =      m_mem_db.removeImage(id);
 
-//		// populate the relevant buckets with that image's data
-//		foreach(byte chan; 0..sig.sigs.length)
-//		{
-//			auto bucket_chan = m_buckets[chan];
-//			foreach(coeffi_t coeff; sig.sigs[chan])
-//			{
-//				bucketForCoeff(coeff, chan).push(user_id);
-//			}
-//		}
+		version(unittest) {
+			assert(ret1.sameAs(ret2));
+		}
 
-//		// append an ImageAddJob
-//		m_add_jobs ~= img;
+		return ret1;
+	}
 
-//		// Append the image's DC onto the memory array of DC data
-//		// and record its position in the array
-//		enforce(m_user_mem_ids_map.elemAt(user_id).empty,
-//			"Image with that ID is already held in memory!");
-//		m_mem_imgs ~= IDImageSansSig(user_id, img.dc, img.res);
-//		m_user_mem_ids_map[user_id] = m_mem_imgs.length - 1;
+	void save() {
+		persist_layer.save();
+	}
 
-//		return img;
-//	}
+	~this() {
+		persist_layer.destroy();
+	}
 
-//	auto numImages() @property { return m_mem_imgs.length; }
+	auto query(QueryParams query) {
+		return m_mem_db.query(query);
+	}
+	auto imageDataIterator() {
+		return persist_layer.imageDataIterator();
+	}
 
-//	/* Will implement this later
-//	bool removeImage(image_id_t user_id)
-//	{
-//		auto mem_idx_range = m_user_mem_ids_map.elemAt(user_id);
-//		enforce(!mem_idx_range.empty, "that id doesn't exist in this database");
-//		auto mem_idx = mem_idx.front;
-//		auto sig = m_mem_imgs[mem_idx];
+private:
+	void queueAddJob(ImageIdSigDcRes img) {
+		persist_layer.appendImage(img);
+	}
 
-//		// Remove the image from all the buckets
+	// Path to the database file this is bound to
+	string m_db_path;
+	scope PersistanceLayer persist_layer;
+	MemDb m_mem_db;
+}
 
-//		throw new Exception("not implemented");
-//	}*/
+version(unittest)
+{
+	import std.algorithm : equal;
+	import std.stdio;
+	import std.file : remove;
 
-//	ref Bucket bucketForCoeff(coeffi_t coeff, chan_t chan)
-//	{
-//		return m_buckets[chan][bucketIndexForCoeff(coeff)];
-//	}
+	static string tmp_db_path = "test/tmp_db_path.db";
 
-//	ref const auto buckets() @property
-//	{
-//		return m_buckets;
-//	}
 
-//private:
-//	// Path to the database file this is bound to
-//	scope string m_db_path;
-//	scope File m_db_handle;
+	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
+		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
+		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
+		return img;
+	}
+}
 
-//	// Maps a user_id to its index in m_mem_imgs
-//	scope UserInternMap m_user_mem_ids_map;
-//	scope IDImageSansSig[] m_mem_imgs;
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	scope f = FileDb.fromFile(tmp_db_path, true);
+	auto i = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	assert(f.numImages() == 0);
+	f.addImage(i);
+	assert(f.numImages() == 1);
+}
 
-//	// Maps a user_id to its location on the disk DB
-//	scope UserInternMap m_user_file_ids_map;
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	scope f = FileDb.fromFile(tmp_db_path, true);
+	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
+	auto img2 = imageFromFile(1, "test/cat_a1.jpg");
 
-//	// Coefficient buckets
-//	Bucket[(ImageArea*2)-1][NumColorChans] m_buckets;
+	f.addImage(img1);
+	f.addImage(img2);
+	f.save();
 
-//	// Logs images being inserted and removed from the database
-//	// so when .save() is called, the in database file can
-//	// be synced with the state of the memory database
-//	alias ImageAddJob = IDImageData;
-//	alias ImageRmJob  = user_id_t;
+	auto ret = f.removeImage(0);
+	assert(ret == img1);
 
-//	scope ImageAddJob[] m_add_jobs;
-//	scope ImageRmJob[]  m_rm_jobs;
-//}
+	assert(f.numImages() == 0);
+}
 
-//version(unittest)
-//{
-//	import std.algorithm : equal;
-//	import std.stdio;
-//}
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	scope f = FileDb.fromFile(tmp_db_path, true);
+	bool thrown = false;
+	try {
+		f.removeImage(0);
+	} catch(BaseDb.IdNotFoundException e) {
+		thrown = true;
+	}
+	assert(thrown);
+}
 
-//unittest {
-//	auto f = new FileDB("");
-//	assert(f.buckets[0][0].coeff == -16384);
-//}
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	scope f = FileDb.fromFile(tmp_db_path, true);
+	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
+	auto img2 = imageFromFile(1, "test/cat_a2.jpg");
 
-//unittest {
-//	auto f = new FileDB("");
-//	auto i = ImageData.fromFile("test/cat_a1.jpg");
-//	assert(f.numImages() == 0);
-//	f.addImage(i);
-//	//assert(f.numImages() == 1);
-//}
+	f.appendImage(img1);
+	f.appendImage(img2);
 
-//unittest {
-//	auto f = new FileDB("nonexistant");
-//	bool thrown = false;
-//	try {
-//		f.load();
-//	} catch(ErrnoException e) {
-//		thrown = true;
-//	}
-//	assert(thrown);
-//}
+	bool thrown = false;
+	try {
+		f.imageDataIterator();
+	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+		thrown = true;
+	}
+	assert(thrown);
 
-//unittest {
-//	auto c = new FileDB.UserInternMap;
-//	c[50] = 3;
-//	c[1] = 2;
-//	assert(!c.elemAt(1).empty);
-//	assert(c.elemAt(1).front == 2);
-//	assert(c.elemAt(2).empty);
-//}
+	f.save();
+	assert(equal(f.imageDataIterator(), [img1, img2]));
+}
+
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
+	auto img2 = imageFromFile(1, "test/cat_a2.jpg");
+	auto img3 = imageFromFile(3, "test/small_png.png");
+
+	{
+		scope f = FileDb.fromFile(tmp_db_path, true);
+		f.appendImage(img1);
+		f.appendImage(img2);
+		f.appendImage(img3);
+	}
+
+	{
+		scope f = FileDb.fromFile(tmp_db_path);
+		assert(equal(f.imageDataIterator(), [img1, img2, img3]));
+	}
+
+}
+
+unittest {
+	scope(exit) { remove(tmp_db_path); }
+	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
+	auto img2 = imageFromFile(1, "test/cat_a2.jpg");
+	auto img3 = imageFromFile(3, "test/small_png.png");
+
+	{
+		scope f = FileDb.fromFile(tmp_db_path, true);
+		f.appendImage(img1);
+		f.appendImage(img2);
+		f.appendImage(img3);
+	}
+
+	{
+		scope f = FileDb.fromFile(tmp_db_path);
+		f.removeImage(1);
+	}
+
+	{
+		scope f = FileDb.fromFile(tmp_db_path);
+		assert(equal(f.imageDataIterator(), [img1, img2]));
+	}
+
+}
