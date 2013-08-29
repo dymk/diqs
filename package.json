@@ -5,6 +5,21 @@
 	"authors": [
 		"Dylan Knutson"
 	],
+
+	"sourceFiles": [
+		"vendor/dcollections/HashMap.d",
+		"vendor/dcollections/Hash.d",
+		"vendor/dcollections/Link.d",
+		"vendor/dcollections/DefaultAllocator.d",
+		"vendor/dcollections/util.d",
+		"vendor/dcollections/DefaultFunctions.d",
+		"vendor/dcollections/model/Map.d",
+		"vendor/dcollections/model/Keyed.d",
+		"vendor/dcollections/model/Iterator.d"
+	],
+
 	"dependencies": {
-	}
+	},
+
+	"libs-linux": ["MagickWand", "MagickCore"]
 }

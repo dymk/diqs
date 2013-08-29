@@ -1,7 +1,5 @@
 module magick_wand.types;
 
-import magick_wand;
-
 alias MagickBooleanType = bool;
 alias WandPtr = void*;
 

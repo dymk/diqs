@@ -1,6 +1,6 @@
 module magick_wand.wand;
 
-import magick_wand;
+import magick_wand.all;
 
 import std.string;
 import std.exception : enforce;
@@ -8,7 +8,6 @@ import core.memory : GC;
 
 // "magick-wand-private.h", line 33
 class MagickWand {
-	private WandPtr wandPtr = null;
 	this()
 	{
 		wandPtr = NewMagickWand();
@@ -28,6 +27,10 @@ class MagickWand {
 	auto imageHeight()  { return this.wandPtr.MagickGetImageHeight(); }
 	auto clear()        { return this.wandPtr.ClearMagickWand(); }
 	auto isMagickWand() { return this.wandPtr.IsMagickWand(); }
+	auto scaleImage(size_t cols, size_t rows)
+	{
+		return this.wandPtr.MagickScaleImage(cols, rows);
+	}
 	auto resizeImage(size_t cols, size_t rows, FilterTypes filter, double blur)
 	{
 		return this.wandPtr.MagickResizeImage(cols, rows, filter, blur);
@@ -96,8 +99,31 @@ class MagickWand {
 			return null;
 		}
 	}
-};
 
+	// Flyweight pattern to avoid needless allocations
+	static getWand() {
+		if(disposedWands.length == 0)
+		{
+			return new MagickWand();
+		}
+		else
+		{
+			auto w = disposedWands[$-1];
+			disposedWands.length--;
+			return w;
+		}
+	}
+	static disposeWand(MagickWand wand) {
+		wand.clear();
+		disposedWands ~= wand;
+	}
+
+private:
+	static MagickWand[] disposedWands;
+	WandPtr wandPtr = null;
+}
+
+version(none) {
 // isMagickWand
 unittest {
 	scope wand = new MagickWand;
@@ -149,4 +175,5 @@ unittest {
 	foreach(p; px[0]) {
 		assert(p == RGB(255, 255, 255));
 	}
+}
 }
