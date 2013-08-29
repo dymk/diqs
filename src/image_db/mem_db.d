@@ -166,7 +166,7 @@ class MemDb : BaseDb
 		return ret;
 	}
 
-	size_t numImages() { return m_mem_imgs.length; }
+	uint numImages() { return cast(uint) m_mem_imgs.length; }
 
 	auto query(const QueryParams params)
 	{

@@ -29,6 +29,9 @@ import consts :
   NumColorChans,
   NumBuckets;
 
+import query :
+  QueryParams;
+
 import persistance_layer.persistance_layer : PersistanceLayer;
 import persistance_layer.on_disk_persistance : OnDiskPersistance;
 
@@ -52,10 +55,10 @@ class FileDb : BaseDb
 	}
 
 	user_id_t addImage(in ImageSigDcRes img) {
-		auto ret = m_mem_db.addImage(img);
-		ImageIdSigDcRes img_sig = ImageIdSigDcRes(ret, img.sig, img.dc, img.res);
+		user_id_t user_id = m_mem_db.addImage(img);
+		ImageIdSigDcRes img_sig = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
 		queueAddJob(img_sig);
-		return ret;
+		return user_id;
 	}
 
 	user_id_t addImage(in ImageIdSigDcRes img) {
@@ -64,7 +67,7 @@ class FileDb : BaseDb
 		return ret;
 	}
 
-	size_t numImages() {
+	uint numImages() {
 		version(unittest) {
 			if(!persist_layer.dirty) {
 				assert(m_mem_db.numImages() == persist_layer.length);
@@ -92,8 +95,12 @@ class FileDb : BaseDb
 		persist_layer.destroy();
 	}
 
-	alias query = m_mem_db.query;
-	alias imageDataIterator = persist_layer.imageDataIterator;
+	auto query(QueryParams query) {
+		return m_mem_db.query(query);
+	}
+	auto imageDataIterator() {
+		return persist_layer.imageDataIterator();
+	}
 
 private:
 	void queueAddJob(ImageIdSigDcRes img) {

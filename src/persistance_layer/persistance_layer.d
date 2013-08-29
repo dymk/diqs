@@ -20,6 +20,8 @@ interface PersistanceLayer
 
 	BucketSizes* bucketSizes();
 
+	uint length();
+
 	interface ImageDataIterator {
 		ImageIdSigDcRes front();
 		void popFront();

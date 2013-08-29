@@ -5,7 +5,9 @@ module image_db.base_db;
  */
 
 import types : user_id_t, coeffi_t;
-import sig : ImageIdSigDcRes;
+import sig :
+  ImageIdSigDcRes,
+  ImageSigDcRes;
 import consts : ImageArea, NumColorChans;
 
 import std.conv : to;
@@ -33,12 +35,24 @@ interface BaseDb
 	user_id_t addImage(in ImageIdSigDcRes);
 
 	/**
+	 * This version does the same as the previous, but the database
+	 * implementation will decide on the user_id to assign to the
+	 * image.
+	 */
+	user_id_t addImage(in ImageSigDcRes);
+
+	/**
 	 * Removes an image with a given user ID from the database, returning
 	 * the image if it was removed, or null if it failed. It may throw if
 	 * the given ID wans't found in the database to begin with,
 	 * or if removal failed for some reason.
 	 */
 	ImageIdSigDcRes removeImage(user_id_t);
+
+	/**
+	 * Returns the number of images in the database.
+	 */
+	uint numImages();
 }
 
 class IdGen(T)

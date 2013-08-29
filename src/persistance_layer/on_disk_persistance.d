@@ -103,7 +103,7 @@ class OnDiskPersistance : PersistanceLayer
 		m_add_jobs.insertBack(image);
 	}
 
-	size_t length() {
+	uint length() {
 		enforceEx!DatabaseDirtyException(!dirty);
 		return m_num_images;
 	}
