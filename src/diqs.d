@@ -23,7 +23,6 @@ import core.exception : OutOfMemoryError;
 void main()
 {
 
-	writefln("ID: %3d : %s%%", 12, 145);
 	version(unittest) {
 		writeln("Size of BucketManager: ", __traits(classInstanceSize, BucketManager));
 		writeln("Size of Bucket: ", Bucket.sizeof);
@@ -81,9 +80,10 @@ void main()
 	return;
 }
 
-void loadDirectory(BaseDb db, string dir)
+void loadDirectory(FileDb db, string dir)
 {
 	auto gen = new IdGen!user_id_t;
+	int index = 0;
 	foreach(name; dirEntries(dir, SpanMode.breadth)) {
 		auto id = gen.next();
 		auto img = ImageSigDcRes.fromFile(name);
@@ -92,6 +92,11 @@ void loadDirectory(BaseDb db, string dir)
 		db.addImage(imgWithId);
 
 		stderr.writeln(id, ":", name);
+		if(index % 500 == 0 && index != 0) {
+			writeln("Syncing database with disk");
+			db.save();
+		}
+		index++;
 	}
 
 	writeln("Loaded ", db.numImages(), " images.");
