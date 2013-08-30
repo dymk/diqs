@@ -20,6 +20,7 @@ interface PersistanceLayer
 
 	BucketSizes* bucketSizes();
 
+	bool dirty();
 	uint length();
 
 	interface ImageDataIterator {

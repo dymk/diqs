@@ -38,8 +38,11 @@ interface BaseDb
 	 * This version does the same as the previous, but the database
 	 * implementation will decide on the user_id to assign to the
 	 * image.
+	 *
+	 * Not implemented yet, because I'm not sure if I want to delegate
+	 * selection to outside of the database implementations.
 	 */
-	user_id_t addImage(in ImageSigDcRes);
+	//user_id_t addImage(in ImageSigDcRes);
 
 	/**
 	 * Removes an image with a given user ID from the database, returning

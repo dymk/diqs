@@ -376,15 +376,11 @@ version(unittest) {
 	import std.stdio : writeln;
 	import std.algorithm : equal;
 
+	import sig : imageFromFile;
+
 	auto getBlankDatabase(string file_path) {
 		assert(!exists(file_path));
 		return OnDiskPersistance.fromFile(test_file_path, true);
-	}
-
-	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
-		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
-		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
-		return img;
 	}
 
 	static ~this() {

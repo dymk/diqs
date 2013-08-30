@@ -58,7 +58,7 @@ struct ImageSig
 	{
 		import std.algorithm : sort;
 
-		bool sameAs(in ImageSig other) const
+		bool sameAs(ImageSig other) const
 		{
 			ImageSig o_dup = other;
 			ImageSig t_dup = this;
@@ -188,7 +188,7 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	version(assert) {
+	version(unittest) {
 		bool sameAs(ImageIdSigDcRes other) const {
 			return (
 				other.user_id == this.user_id &&
@@ -196,5 +196,13 @@ struct ImageIdSigDcRes
 				other.res == this.res &&
 				other.sig.sameAs(this.sig));
 		}
+	}
+}
+
+version(unittest) {
+	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
+		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
+		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
+		return img;
 	}
 }
