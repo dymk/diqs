@@ -79,7 +79,7 @@ class MemDb : BaseDb
 
 	user_id_t addImage(in ImageIdSigDcRes img)
 	{
-		immutable user_id = img.user_id;
+		user_id_t user_id = img.user_id;
 		synchronized
 		{
 			if(user_id in id_intern_map)

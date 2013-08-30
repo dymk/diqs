@@ -124,7 +124,7 @@ private:
 
 	// Path to the database file this is bound to
 	string m_db_path;
-	scope PersistanceLayer persist_layer;
+	PersistanceLayer persist_layer;
 	MemDb m_mem_db;
 }
 
