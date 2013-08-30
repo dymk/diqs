@@ -566,11 +566,11 @@
  </Config>
  <Folder name="diqs">
   <Folder name="src">
-   <Folder name="persistance_layer">
-    <File path="src\persistance_layer\file_helpers.d" />
-    <File path="src\persistance_layer\mysql_persistance.d" />
-    <File path="src\persistance_layer\on_disk_persistance.d" />
-    <File path="src\persistance_layer\persistance_layer.d" />
+   <Folder name="persistence_layer">
+    <File path="src\persistence_layer\file_helpers.d" />
+    <File path="src\persistence_layer\mysql_persistence.d" />
+    <File path="src\persistence_layer\on_disk_persistence.d" />
+    <File path="src\persistence_layer\persistence_layer.d" />
    </Folder>
    <Folder name="image_db">
     <File path="src\image_db\all.d" />

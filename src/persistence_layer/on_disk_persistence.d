@@ -1,4 +1,4 @@
-module persistance_layer.on_disk_persistance;
+module persistence_layer.on_disk_persistence;
 
 import std.stdio : File;
 import std.conv : to;
@@ -6,8 +6,8 @@ import std.container : Array;
 import std.file : exists;
 import std.exception : enforce, enforceEx;
 
-import persistance_layer.persistance_layer : PersistanceLayer;
-import persistance_layer.file_helpers;
+import persistence_layer.persistence_layer : PersistenceLayer;
+import persistence_layer.file_helpers;
 
 import sig :
 	ImageIdSigDcRes,
@@ -34,19 +34,19 @@ import image_db.base_db : BaseDb;
 // nice for massive databases to not have to be scanned more than
 // one time on startup.
 
-class OnDiskPersistance : PersistanceLayer
+class OnDiskPersistence : PersistenceLayer
 {
-	static class OnDiskPersistanceException : Exception {
+	static class OnDiskPersistenceException : Exception {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
 
-	static class InvalidFileException : OnDiskPersistanceException {
+	static class InvalidFileException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
-	static class DatabaseNotFoundException : OnDiskPersistanceException {
+	static class DatabaseNotFoundException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
-	static class DatabaseDirtyException : OnDiskPersistanceException {
+	static class DatabaseDirtyException : OnDiskPersistenceException {
 		this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is dirty", file, line, next); }
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
@@ -57,7 +57,7 @@ class OnDiskPersistance : PersistanceLayer
 	enum OffsetBucketSizes = OffsetNumImages + uint.sizeof;
 	enum OffsetImageData   = OffsetBucketSizes + (uint.sizeof * NumBuckets);
 
-	static OnDiskPersistance fromFile(string file_path, bool create_if_nonexistant = false)
+	static OnDiskPersistence fromFile(string file_path, bool create_if_nonexistant = false)
 	{
 		File db_file;
 
@@ -78,7 +78,7 @@ class OnDiskPersistance : PersistanceLayer
 			db_file = File(file_path, "rb+"); // Opens for reading/writing (doens't truncate file)
 		}
 
-		return new OnDiskPersistance(db_file);
+		return new OnDiskPersistence(db_file);
 	}
 
 	BucketSizes* bucketSizes() {
@@ -352,19 +352,19 @@ private void writeBlankDbFile(File handle)
 {
 	handle.seek(0);
 
-	enforce(handle.tell() == OnDiskPersistance.OffsetMagic);
-	handle.writeUlong(OnDiskPersistance.Magic);
+	enforce(handle.tell() == OnDiskPersistence.OffsetMagic);
+	handle.writeUlong(OnDiskPersistence.Magic);
 
-	enforce(handle.tell() == OnDiskPersistance.OffsetNumImages);
+	enforce(handle.tell() == OnDiskPersistence.OffsetNumImages);
 	handle.writeUint(0);
 
-	enforce(handle.tell() == OnDiskPersistance.OffsetBucketSizes);
+	enforce(handle.tell() == OnDiskPersistence.OffsetBucketSizes);
 	foreach(i; 0..NumBuckets)
 	{
 		handle.writeUint(0);
 	}
 
-	enforce(handle.tell() == OnDiskPersistance.OffsetImageData);
+	enforce(handle.tell() == OnDiskPersistence.OffsetImageData);
 
 	handle.flush();
 	handle.seek(0);
@@ -380,7 +380,7 @@ version(unittest) {
 
 	auto getBlankDatabase(string file_path) {
 		assert(!exists(file_path));
-		return OnDiskPersistance.fromFile(test_file_path, true);
+		return OnDiskPersistence.fromFile(test_file_path, true);
 	}
 
 	static ~this() {
@@ -392,19 +392,19 @@ version(unittest) {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	assert(db.length == 0);
 }
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	assert(!db.dirty);
 }
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 
 	foreach(ImageIdSigDcRes img; db.imageDataIterator()) {
 		assert(false);
@@ -413,7 +413,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 
 	assert(db.length == 0);
@@ -421,7 +421,7 @@ unittest {
 	bool thrown = false;
 	try {
 		db.length;
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);
@@ -429,7 +429,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 
 	assert(db.length == 0);
@@ -440,14 +440,14 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	db.appendImage(imageFromFile(0, "test/cat_a1.jpg"));
 
 	// Dirty database shouldn't allow itteration over its data
 	bool thrown = false;
 	try {
 		db.imageDataIterator();
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);
@@ -466,7 +466,7 @@ unittest {
 		foreach(img; itr) {
 			assert(false);
 		}
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);
@@ -474,14 +474,14 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 	db.appendImage(img1);
 
 	bool thrown = false;
 	try {
 		db.getImage(0);
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);
@@ -492,7 +492,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 	db.appendImage(img1);
 
@@ -508,7 +508,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(test_file_path); }
-	scope OnDiskPersistance db = getBlankDatabase(test_file_path);
+	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
 
 	auto img1 = imageFromFile(1, "test/cat_a1.jpg");
 	auto img2 = imageFromFile(2, "test/cat_a2.jpg");
@@ -531,12 +531,12 @@ unittest {
 unittest {
 	scope(exit) { remove(test_file_path); }
 	{
-		scope OnDiskPersistance db = OnDiskPersistance.fromFile(test_file_path, true);
+		scope OnDiskPersistence db = OnDiskPersistence.fromFile(test_file_path, true);
 		assert(db.hasValidHeaders());
 	}
 	// Test that new datbases are written and valid.
 	{
-		scope OnDiskPersistance db = OnDiskPersistance.fromFile(test_file_path);
+		scope OnDiskPersistence db = OnDiskPersistence.fromFile(test_file_path);
 		assert(db.hasValidHeaders());
 	}
 }
@@ -557,7 +557,7 @@ unittest {
 
 	// And reopening the database yields the same image data
 	{
-		scope db = OnDiskPersistance.fromFile(test_file_path);
+		scope db = OnDiskPersistence.fromFile(test_file_path);
 		assert(db.length == 3);
 		assert(equal(db.imageDataIterator(), [img1, img2, img3]));
 	}
@@ -578,14 +578,14 @@ unittest {
 	}
 
 	{
-		scope db = OnDiskPersistance.fromFile(test_file_path);
+		scope db = OnDiskPersistence.fromFile(test_file_path);
 		auto ret = db.removeImage(3);
 		assert(ret == img3);
 	}
 
 	// And reopening the database yields the same image data
 	{
-		scope db = OnDiskPersistance.fromFile(test_file_path);
+		scope db = OnDiskPersistence.fromFile(test_file_path);
 		assert(db.length == 2);
 		assert(equal(db.imageDataIterator(), [img1, img2]));
 	}
@@ -601,7 +601,7 @@ unittest {
 	bool thrown = false;
 	try {
 		db.bucketSizes();
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);

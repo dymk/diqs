@@ -32,18 +32,18 @@ import consts :
 import query :
   QueryParams;
 
-import persistance_layer.persistance_layer : PersistanceLayer;
-import persistance_layer.on_disk_persistance : OnDiskPersistance;
+import persistence_layer.persistence_layer : PersistenceLayer;
+import persistence_layer.on_disk_persistence : OnDiskPersistence;
 
 class FileDb : BaseDb
 {
 
 	static FileDb fromFile(string path, bool create_if_nonexistant = false)
 	{
-		return new FileDb(OnDiskPersistance.fromFile(path, create_if_nonexistant));
+		return new FileDb(OnDiskPersistence.fromFile(path, create_if_nonexistant));
 	}
 
-	this(PersistanceLayer persist_layer) {
+	this(PersistenceLayer persist_layer) {
 		this.persist_layer = persist_layer;
 		this.m_mem_db = new MemDb(this.persist_layer.length);
 
@@ -124,7 +124,7 @@ private:
 
 	// Path to the database file this is bound to
 	string m_db_path;
-	PersistanceLayer persist_layer;
+	PersistenceLayer persist_layer;
 	MemDb m_mem_db;
 }
 
@@ -180,7 +180,7 @@ unittest {
 	bool thrown = false;
 	try {
 		f.imageDataIterator();
-	} catch(OnDiskPersistance.DatabaseDirtyException e) {
+	} catch(OnDiskPersistence.DatabaseDirtyException e) {
 		thrown = true;
 	}
 	assert(thrown);

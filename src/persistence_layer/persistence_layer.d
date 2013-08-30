@@ -1,4 +1,4 @@
-module persistance_layer.persistance_layer;
+module persistence_layer.persistence_layer;
 
 import sig :
   ImageIdSigDcRes;
@@ -9,7 +9,7 @@ import types :
 import image_db.bucket_manager :
   BucketSizes;
 
-interface PersistanceLayer
+interface PersistenceLayer
 {
 	ImageIdSigDcRes getImage(user_id_t);
 	ImageIdSigDcRes removeImage(user_id_t);

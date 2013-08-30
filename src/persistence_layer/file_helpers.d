@@ -1,4 +1,4 @@
-module persistance_layer.file_helpers;
+module persistence_layer.file_helpers;
 
 import std.stdio : File;
 
