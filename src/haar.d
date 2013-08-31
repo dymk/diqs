@@ -3,7 +3,7 @@ module haar;
 import std.array : front;
 import std.math : SQRT2, approxEqual;
 import std.exception : enforce;
-//import std.parallelism : taskPool;
+import std.parallelism : taskPool;
 import std.range : iota;
 
 /* Convert an array of pixels to a X by Y matrix of pixels */
@@ -41,15 +41,15 @@ if(is(T : float))
 	}
 
 	// Perform on each row
-	//foreach(i, ref row; taskPool.parallel(in_mat)) {
-	foreach(i, ref row; in_mat) {
+	foreach(i, ref row; taskPool.parallel(in_mat)) {
+	//foreach(i, ref row; in_mat) {
 		haar1d(row);
 	}
 
 	// And now on each column
 	scope temp_row = new float[in_mat_rows];
-	//foreach(x; taskPool.parallel(iota(in_mat_cols))) {
-	foreach(x; iota(in_mat_cols)) {
+	foreach(x; taskPool.parallel(iota(in_mat_cols))) {
+	//foreach(x; iota(in_mat_cols)) {
 		foreach(y; 0..in_mat_rows) {
 			temp_row[y] = in_mat[y][x];
 		}
