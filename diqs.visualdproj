@@ -194,7 +194,7 @@
   <lib>0</lib>
   <subsystem>0</subsystem>
   <multiobj>0</multiobj>
-  <singleFileCompilation>0</singleFileCompilation>
+  <singleFileCompilation>2</singleFileCompilation>
   <oneobj>0</oneobj>
   <trace>0</trace>
   <quiet>0</quiet>
@@ -232,7 +232,7 @@
   <nofloat>0</nofloat>
   <Dversion>2</Dversion>
   <ignoreUnsupportedPragmas>0</ignoreUnsupportedPragmas>
-  <compiler>0</compiler>
+  <compiler>2</compiler>
   <otherDMD>0</otherDMD>
   <program>$(DMDInstallDir)windows\bin\dmd.exe</program>
   <imppath />
@@ -566,12 +566,6 @@
  </Config>
  <Folder name="diqs">
   <Folder name="src">
-   <Folder name="persistence_layer">
-    <File path="src\persistence_layer\file_helpers.d" />
-    <File path="src\persistence_layer\mysql_persistence.d" />
-    <File path="src\persistence_layer\on_disk_persistence.d" />
-    <File path="src\persistence_layer\persistence_layer.d" />
-   </Folder>
    <Folder name="image_db">
     <File path="src\image_db\all.d" />
     <File path="src\image_db\base_db.d" />
@@ -587,6 +581,12 @@
     <File path="src\magick_wand\funcs.d" />
     <File path="src\magick_wand\types.d" />
     <File path="src\magick_wand\wand.d" />
+   </Folder>
+   <Folder name="persistence_layer">
+    <File path="src\persistence_layer\file_helpers.d" />
+    <File path="src\persistence_layer\mysql_persistence.d" />
+    <File path="src\persistence_layer\on_disk_persistence.d" />
+    <File path="src\persistence_layer\persistence_layer.d" />
    </Folder>
    <File path="src\consts.d" />
    <File path="src\delta_queue.d" />

@@ -390,6 +390,8 @@ version(unittest) {
 	}
 }
 
+version(TestOnDiskPersistence) {
+
 unittest {
 	scope(exit) { remove(test_file_path); }
 	scope OnDiskPersistence db = getBlankDatabase(test_file_path);
@@ -649,3 +651,5 @@ unittest {
 	}
 	assert(numOne == NumSigCoeffs*NumColorChans);
 }
+
+} // version(TestOnDiskPersistence)

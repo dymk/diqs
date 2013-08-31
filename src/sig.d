@@ -27,15 +27,16 @@ import haar : haar2d;
 import util : largestCoeffs;
 
 import std.exception : enforce;
-import std.algorithm : map, copy;
+import std.algorithm : map, copy, filter;
 import std.range : array;
 import std.string : format;
+import std.stdio : writeln;
 import core.memory : GC;
 
 struct CoeffIPair
 {
 	coeffi_t index;
-	coeff_t  coeff;
+	coeff_t  coeff = 0;
 
 	string toString() {
 		return format("i: %d, c: %f", index, coeff);
@@ -108,17 +109,6 @@ struct ImageSigDcRes
 	ImageRes res;
 
 	static auto fromFile(string file)
-	out(ret)
-	{
-		import std.algorithm : filter;
-		import std.string;
-		// Assert there are no 0 coefficients in the sig
-		foreach(sig_t s; ret.sig.sigs) {
-			assert(filter!(a => a == 0)(s[]).array().length == 0,
-				format("0 coeff found: %s", s[]));
-		}
-	}
-	body
 	{
 		auto ret = ImageSigDcRes();
 
@@ -139,7 +129,9 @@ struct ImageSigDcRes
 			enforce(wand.scaleImage(ImageWidth, ImageHeight));
 		}
 
-		scope pixels = wand.exportImagePixelsFlat!YIQ();
+		auto pixels = wand.exportImagePixelsFlat!YIQ();
+		scope(exit) { GC.free(pixels.ptr); }
+
 		enforce(pixels);
 
 		scope ychan = pixels.map!(a => cast(coeff_t)a.y).array();
@@ -166,6 +158,18 @@ struct ImageSigDcRes
 		ilargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.i[]);
 		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
 		ret.sig = sig;
+
+		version(assert) {
+			foreach(sig_t s; ret.sig.sigs) {
+				if(filter!(a => a == 0)(s[]).array().length != 0)
+				{
+					writeln(format("0 coeff found in sig of %s: %s", file, s[]));
+					writeln("First set from the chan: ", ychan[0..10]);
+					writeln("DC: ", ret.dc);
+					assert(false);
+				}
+			}
+		}
 
 		return ret;
 	}
