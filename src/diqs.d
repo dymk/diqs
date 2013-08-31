@@ -9,16 +9,16 @@ import image_db.all;
 
 import std.stdio;
 import std.file;
+import std.file : remove;
 import std.stdio;
 import std.string;
 import std.algorithm;
 import std.array;
 import std.datetime;
-//import std.parallelism : taskPool;
+import std.parallelism : taskPool;
 import core.memory;
 import core.time;
 import core.exception : OutOfMemoryError;
-
 
 void main()
 {
@@ -35,8 +35,11 @@ void main()
 		return;
 	}
 
+	auto gen = new IdGen!user_id_t;
+
 	write("Database name:\n> ");
 	string dbname = readln().chomp();
+	//string dbname = "mydb";
 	string dbpath = "test/ignore/"~dbname;
 
 	if(exists(dbpath)) {
@@ -46,12 +49,22 @@ void main()
 	auto db = FileDb.fromFile(dbpath, true);
 	writeln("Database has ", db.numImages(), " loaded after opening");
 
-	if(db.numImages() == 0)
+	write("Directory to load:\n> ");
+
+	string loaddir;
+	while((loaddir = readln()) !is null)
 	{
-		write("Directory to load:\n> ");
-		string dir = readln().chomp();
-		loadDirectory(db, dir);
+		loaddir = loaddir.chomp();
+		if(loaddir == "")
+			break;
+
+		foreach(alsdk; 0..10)
+			loadDirectory(gen, db, loaddir);
+
+		writeln("Syncing database with disk");
 		db.save();
+
+		write("Directory to load:\n> ");
 	}
 
 	string querypath;
@@ -80,9 +93,9 @@ void main()
 	return;
 }
 
-void loadDirectory(FileDb db, string dir)
+void loadDirectory(Gen)(Gen gen, FileDb db, string dir)
 {
-	auto gen = new IdGen!user_id_t;
+
 	int index = 0;
 	foreach(name; dirEntries(dir, SpanMode.breadth)) {
 		auto id = gen.next();
@@ -93,8 +106,8 @@ void loadDirectory(FileDb db, string dir)
 
 		stderr.writeln(id, ":", name);
 		if(index % 500 == 0 && index != 0) {
-			writeln("Syncing database with disk");
-			db.save();
+			//writeln("Syncing database with disk");
+			//db.save();
 		}
 		index++;
 	}

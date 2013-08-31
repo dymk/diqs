@@ -1,4 +1,4 @@
-DC ?= ldmd2 -v
+DC ?= ldmd2
 
 DC_OUT = $(shell $(DC) 2>/dev/null | head -1)
 
@@ -19,6 +19,7 @@ endif
 RELEASE_FLAGS  += -O -release -noboundscheck -inline
 DEBUG_FLAGS    += -debug -de -g
 UNITTEST_FLAGS += -unittest -debug -g
+UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
 # Build the import directory string out of the given import directories
 # (append -I to each directory)
@@ -39,6 +40,11 @@ release: $(DIQS_BIN)
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
 unittest: $(DIQS_BIN)
+	$(DIQS_BIN)
+
+.PHONY: unittest_diskio
+unittest_diskio: DC_FLAGS += $(UNITTEST_DISKIO_FLAGS)
+unittest_diskio: $(DIQS_BIN)
 	$(DIQS_BIN)
 
 $(DIQS_BIN):
