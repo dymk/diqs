@@ -17,7 +17,7 @@ import delta_queue : DeltaQueue;
 
 struct Bucket
 {
-	enum GUESS_SET_LEN = 50_000;
+	enum GUESS_SET_LEN =   5_000;
 	enum MAX_SET_LEN   = 500_000;
 
 	alias IdContainer = DeltaQueue!intern_id_t;
@@ -49,7 +49,8 @@ struct Bucket
 				// 1000 (arbitrary) so really small sets aren't created in case
 				// size_hint was small.
 				// Effectivly ensure that 1000 < container_len <
-				container_len = max(min(MAX_SET_LEN, size_hint), 1000);
+				//container_len = max(min(MAX_SET_LEN, size_hint), 1000);
+				container_len = min(MAX_SET_LEN, size_hint);
 				size_hint -= container_len;
 			}
 
