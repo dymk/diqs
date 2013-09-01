@@ -15,6 +15,7 @@ import std.container : BinaryHeap, heapify;
 import std.math : abs;
 
 //version = BinaryHeapLC;
+// Seems that PartialSort is a few percent faster. 
 version = PartialSort;
 
 version(PartialSort) {

@@ -16,7 +16,7 @@ endif
 #   UNITTEST_FLAGS += -op
 # endif
 
-RELEASE_FLAGS         += -O -release -noboundscheck -inline
+RELEASE_FLAGS         += -O -release -noboundscheck -inline -g
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 DEBUG_FLAGS           += -debug -de -gc
 UNITTEST_FLAGS        += -unittest -debug -g
