@@ -3,7 +3,7 @@ module consts;
  * Module Consts: Configuration constatants for DIQS.
  */
 
-import util : min, max;
+import std.algorithm : min, max;
 import types :
   score_t;
 

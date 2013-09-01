@@ -6,8 +6,8 @@ module types;
 
 import consts : NumSigCoeffs, ImageArea;
 
-alias intern_id_t = uint; // Internal ID for image data
-alias user_id_t   = ulong;  // User facing immutable ID for image data
+alias intern_id_t = uint;   // Internal ID for referencing image data
+alias user_id_t   = ulong;  // Assignable, unique, user facing immutable ID
 alias coeff_t     = float;
 alias coeffi_t    = short;
 alias chan_t      = ubyte;

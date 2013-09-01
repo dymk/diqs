@@ -216,3 +216,16 @@ unittest {
 	auto ret = f.removeId(2);
 	assert(ret.sameAs(sig));
 }
+
+unittest {
+	auto f = new BucketManager();
+	auto b1 = f.bucketForCoeff(10, 0);
+	auto b2 = f.bucketForCoeff(-10, 0);
+	b1.push(0);
+	assert(b1.length == 1);
+	assert(b2.length == 0);
+
+	b2.push(2);
+	assert(b1.length == 1);
+	assert(b2.length == 1);
+}

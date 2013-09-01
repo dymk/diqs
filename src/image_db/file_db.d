@@ -22,7 +22,7 @@ import sig :
   ImageRes,
   ImageDc;
 
-import image_db.base_db : BaseDb;
+import image_db.base_db : BaseDb, IdGen;
 import image_db.mem_db : MemDb;
 import consts :
   ImageArea,
@@ -46,18 +46,32 @@ class FileDb : BaseDb
 	this(PersistenceLayer persist_layer) {
 		this.persist_layer = persist_layer;
 		this.m_mem_db = new MemDb(this.persist_layer.length);
+		this.m_id_gen = new IdGen!user_id_t;
 
 		m_mem_db.bucketSizeHint(persist_layer.bucketSizes());
 
 		foreach(ref image; persist_layer.imageDataIterator()) {
+			m_id_gen.saw(image.user_id);
 			m_mem_db.addImage(image);
 		}
 	}
 
+	user_id_t addImage(in ImageSigDcRes img) {
+		user_id_t user_id = m_id_gen.next();
+		auto id_img = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+		return addImage(id_img);
+	}
+
 	user_id_t addImage(in ImageIdSigDcRes img) {
+		m_id_gen.saw(img.user_id);
+
 		auto ret = m_mem_db.addImage(img);
 		queueAddJob(img);
 		return ret;
+	}
+
+	auto getImage(user_id_t id) {
+		return persist_layer.getImage(id);
 	}
 
 	uint numImages() {
@@ -106,8 +120,19 @@ class FileDb : BaseDb
 		persist_layer.save();
 	}
 
+	void close() {
+		persist_layer.close();
+	}
+
 	~this() {
-		persist_layer.destroy();
+		if(persist_layer.isOpen()) {
+			save();
+			close();
+		}
+	}
+
+	user_id_t nextId() {
+		return m_id_gen.next();
 	}
 
 	auto query(QueryParams query) {
@@ -126,6 +151,7 @@ private:
 	string m_db_path;
 	PersistenceLayer persist_layer;
 	MemDb m_mem_db;
+	IdGen!user_id_t m_id_gen;
 }
 
 version(unittest)

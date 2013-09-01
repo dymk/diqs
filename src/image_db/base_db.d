@@ -56,8 +56,11 @@ interface BaseDb
 	 * Returns the number of images in the database.
 	 */
 	uint numImages();
+
+	user_id_t nextId();
 }
 
+// Guarenteed to never return the same number twice.
 class IdGen(T)
 {
 	void saw(T id) {
