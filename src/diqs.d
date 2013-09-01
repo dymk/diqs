@@ -35,14 +35,24 @@ void main()
 		return;
 	}
 
-	auto gen = new IdGen!user_id_t;
 
-	write("Database name:\n> ");
+	version(SpeedTest) {
+		// Loads a directory of images, writes it to the disk, then exits.
+
+		string testdb = "test/ignore/speedtest.diqs";
+		if(exists(testdb)) { remove(testdb); }
+		auto speedtest_db = FileDb.fromFile(testdb, true);
+		loadDirectory(speedtest_db, "test/ignore/search_1_2_resized");
+		speedtest_db.save();
+		return;
+	}
+
+	write("Database name (created in test/ignore):\n> ");
 	string dbname = readln().chomp();
-	//string dbname = "mydb";
+	//string dbname = "smalldb";
 	string dbpath = "test/ignore/"~dbname;
 
-	if(exists(dbpath)) {
+	if(exists(dbpath) && isFile(dbpath)) {
 		writeln("Loading prexisting database");
 	}
 
@@ -58,13 +68,12 @@ void main()
 		if(loaddir == "")
 			break;
 
-		foreach(alsdk; 0..10)
-			loadDirectory(gen, db, loaddir);
+		loadDirectory(db, loaddir);
 
 		writeln("Syncing database with disk");
 		db.save();
 
-		write("Directory to load:\n> ");
+		write("\n> ");
 	}
 
 	string querypath;
@@ -84,25 +93,23 @@ void main()
 		scope results = db.query(query_params);
 		foreach(index, res; results)
 		{
-			writefln("ID: %3d : %s%%", res.image.user_id, res.similarity);
+			writefln("ID: %3d : %3f%%", res.image.user_id, res.similarity);
 		}
 
-		write("Enter image path to compare:\n> ");
+		write("\n> ");
 	}
 
+	db.close();
 	return;
 }
 
-void loadDirectory(Gen)(Gen gen, FileDb db, string dir)
+void loadDirectory(FileDb db, string dir)
 {
 
 	int index = 0;
 	foreach(name; dirEntries(dir, SpanMode.breadth)) {
-		auto id = gen.next();
 		auto img = ImageSigDcRes.fromFile(name);
-		auto imgWithId = ImageIdSigDcRes(id, img.sig, img.dc, img.res);
-
-		db.addImage(imgWithId);
+		auto id = db.addImage(img);
 
 		stderr.writeln(id, ":", name);
 		if(index % 500 == 0 && index != 0) {

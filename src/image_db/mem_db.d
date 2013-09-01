@@ -7,7 +7,7 @@ module image_db.mem_db;
 import image_db.bucket_manager :
   BucketManager,
   BucketSizes;
-import image_db.base_db : BaseDb;
+import image_db.base_db : BaseDb, IdGen;
 import types :
   user_id_t,
   intern_id_t;
@@ -31,8 +31,8 @@ class MemDb : BaseDb
 	/// Loads the database from the file in db_path
 	this()
 	{
-		//m_user_mem_ids_map = new UserInternMap();
 		m_manager = new BucketManager();
+		m_id_gen = new IdGen!user_id_t();
 	}
 
 	this(size_t size_hint)
@@ -80,6 +80,8 @@ class MemDb : BaseDb
 	user_id_t addImage(in ImageIdSigDcRes img)
 	{
 		user_id_t user_id = img.user_id;
+		m_id_gen.saw(user_id);
+
 		synchronized
 		{
 			if(user_id in id_intern_map)
@@ -147,6 +149,7 @@ class MemDb : BaseDb
 	}
 
 	uint numImages() { return cast(uint) m_mem_imgs.length; }
+	user_id_t nextId() { return m_id_gen.next(); }
 
 	auto query(const QueryParams params)
 	{
@@ -166,6 +169,7 @@ private:
 	scope intern_id_t[user_id_t] id_intern_map;
 
 	scope BucketManager m_manager;
+	IdGen!user_id_t m_id_gen;
 }
 
 version(unittest)

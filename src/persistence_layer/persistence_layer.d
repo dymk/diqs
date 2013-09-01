@@ -18,6 +18,8 @@ interface PersistenceLayer
 	void save();
 	void close();
 
+	bool isOpen();
+
 	BucketSizes* bucketSizes();
 
 	bool dirty();

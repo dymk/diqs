@@ -109,6 +109,7 @@ class OnDiskPersistence : PersistenceLayer
 	}
 
 	void save() {
+		enforce(isOpen(), "PL file handle is not open.");
 		syncImageData();
 		syncHeaders();
 	}
@@ -146,6 +147,10 @@ class OnDiskPersistence : PersistenceLayer
 
 	void close() {
 		m_db_file.close();
+	}
+
+	bool isOpen() {
+		return m_db_file.isOpen();
 	}
 
 	bool hasValidHeaders() {
@@ -326,11 +331,6 @@ private:
 
 		enforce(m_db_file.tell() == OffsetImageData);
 		m_db_file.flush();
-	}
-
-	~this() {
-		save();
-		close();
 	}
 
 	alias ImageAddJob = ImageIdSigDcRes;
@@ -549,40 +549,19 @@ unittest {
 	auto img2 = imageFromFile(2, "test/cat_a2.jpg");
 	auto img3 = imageFromFile(3, "test/small_png.png");
 
-	// Test that closing the DB flushes the write queue
 	{
 		scope db = getBlankDatabase(test_file_path);
 		db.appendImage(img1);
 		db.appendImage(img2);
 		db.appendImage(img3);
-	}
-
-	// And reopening the database yields the same image data
-	{
-		scope db = OnDiskPersistence.fromFile(test_file_path);
-		assert(db.length == 3);
-		assert(equal(db.imageDataIterator(), [img1, img2, img3]));
-	}
-}
-
-unittest {
-	scope(exit) { remove(test_file_path); }
-	auto img1 = imageFromFile(1, "test/cat_a1.jpg");
-	auto img2 = imageFromFile(2, "test/cat_a2.jpg");
-	auto img3 = imageFromFile(3, "test/small_png.png");
-
-	// Test that closing the DB flushes the write queue
-	{
-		scope db = getBlankDatabase(test_file_path);
-		db.appendImage(img1);
-		db.appendImage(img2);
-		db.appendImage(img3);
+		db.save();
 	}
 
 	{
 		scope db = OnDiskPersistence.fromFile(test_file_path);
 		auto ret = db.removeImage(3);
 		assert(ret == img3);
+		db.save();
 	}
 
 	// And reopening the database yields the same image data

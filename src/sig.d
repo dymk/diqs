@@ -159,7 +159,7 @@ struct ImageSigDcRes
 		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
 		ret.sig = sig;
 
-		version(assert) {
+		//version(assert) {
 			foreach(sig_t s; ret.sig.sigs) {
 				if(filter!(a => a == 0)(s[]).array().length != 0)
 				{
@@ -169,7 +169,7 @@ struct ImageSigDcRes
 					assert(false);
 				}
 			}
-		}
+		//}
 
 		return ret;
 	}
