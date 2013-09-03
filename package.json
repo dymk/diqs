@@ -10,13 +10,9 @@
 		"vibe-d": "~master"
 	},
 
-	"buildRequirements": [
-		"allowWarnings"
-	],
-
 	"sourceFiles": ["vendor/msgpack-d/src/msgpack.d"],
 	"importPaths": ["vendor/msgpack-d/src"],
-	
+
 	"versions": ["VibeCustomMain"],
 	"targetType": "none",
 	"configurations": [
