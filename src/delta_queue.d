@@ -60,13 +60,13 @@ struct DeltaQueue(run_start_t)
 		if(data.length == 0)
 		{
 			data.length += run_start_t_arr.sizeof;
-			data[0..run_start_t_arr.sizeof] = *(cast(run_start_t_arr*) (&push_value));
+			data[0..run_start_t_arr.sizeof] = (*(cast(run_start_t_arr*) (&push_value)))[0..run_start_t_arr.sizeof];
 		}
 		else if(last_value >= push_value || (last_value + ubyte.max) < push_value)
 		{
 			data.length += 1 + run_start_t.sizeof;
 			data[oldlen] = 0;
-			data[oldlen+1 .. oldlen+run_start_t_arr.sizeof+1] = *(cast(run_start_t_arr*) (&push_value));
+			data[oldlen+1 .. oldlen+run_start_t_arr.sizeof+1] = (*(cast(run_start_t_arr*)(&push_value)))[0..run_start_t_arr.sizeof];
 		}
 		else
 		{
