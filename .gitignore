@@ -11,6 +11,9 @@
 *.sublime-project
 *.sublime-workspace
 
+*.dll
+
+.dub/*
 bin/*
 Debug/*
 Release/*
