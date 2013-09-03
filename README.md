@@ -69,3 +69,21 @@ Type the path of an image to get its score in comparison with the images
 now in the database.
 Results are in the format `ID: <id> : <similarity>%`, where similarity
 is a percent.
+
+
+Todo
+====
+
+ - MySQL/PG persistance layer adapter
+ - Loading bar for loading large databases (trivial)
+ - Network protocol for running DIQS as an actual server
+
+In OnDiskPersistance: 
+ - Break up database into multiple files, perhaps for parallelized 
+loading from the disk? 
+
+
+TODO (Optimizations): 
+ - Profile large database loading (Takes ~5 seconds to load a 100K db).
+ - Profile database querying
+

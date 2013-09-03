@@ -24,37 +24,75 @@ UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
 # Build the import directory string out of the given import directories
 # (append -I to each directory)
-SOURCE_FILES := $(shell ls src/*.d src/**/*.d)
-DIQS_BIN ?= diqs.exe
+SOURCE_FILES := $(shell ls src/**/*.d) \
+  src/consts.d \
+  src/delta_queue.d \
+  src/haar.d \
+  src/query.d \
+  src/reserved_array.d \
+  src/sig.d \
+  src/types.d \
+  src/util.d
+
+SERVER_FILES = src/server.d
+CLIENT_FILES = src/client.d
+
+# VIBE_FILES = $(shell ls vendor/vibe.d/source/vibe/**/*.d)
+# VIBE_OBJ   = vibed.o
+
+VENDOR_INCLUDES = -Ivendor/vibe.d/source -Ivendor/openssl
+
+SERVER_BIN = server
+CLIENT_BIN = client
+DUB_BIN    = vendor/dub/bin/dub
+DUB_BUILD_SCRIPT = ./build.sh
+
+ifeq ($(OS),Windows_NT)
+  SERVER_BIN = server.exe
+  CLIENT_BIN = client.exe
+	DUB_BIN    = vendor/dub/bin/dub.exe
+	DUB_BUILD_SCRIPT = cmd /c build.cmd
+endif
+
+ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN)
 
 .PHONY: all
 all: debug
 
 .PHONY: debug
 debug: DC_FLAGS += $(DEBUG_FLAGS)
-debug: $(DIQS_BIN)
+debug: $(ALL_BIN)
 
 .PHONY: release
 release: DC_FLAGS += $(RELEASE_FLAGS)
-release: $(DIQS_BIN)
+release: $(ALL_BIN)
 
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
-unittest: $(DIQS_BIN)
-	$(DIQS_BIN)
+unittest: $(ALL_BIN)
+	$(ALL_BIN)
 
 .PHONY: unittest_diskio
 unittest_diskio: DC_FLAGS += $(UNITTEST_DISKIO_FLAGS)
-unittest_diskio: $(DIQS_BIN)
-	$(DIQS_BIN)
+unittest_diskio: $(ALL_BIN)
+	$(ALL_BIN)
 
 .PHONY: speedtest
 speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
-speedtest: $(DIQS_BIN)
+speedtest: $(ALL_BIN)
 
+$(SERVER_BIN): $(VIBE_OBJ)
+	$(DC) $(DC_FLAGS) $(SERVER_FILES) $(SOURCE_FILES) $(VIBE_OBJ) $(VENDOR_INCLUDES) -of$(SERVER_BIN)
+	
+$(CLIENT_BIN): $(VIBE_OBJ)
+	$(DC) $(DC_FLAGS) $(CLIENT_FILES) $(SOURCE_FILES) $(VIBE_OBJ) $(VENDOR_INCLUDES) -of$(CLIENT_BIN)
 
-$(DIQS_BIN):
-	$(DC) $(DC_FLAGS) $(SOURCE_FILES) -of$(DIQS_BIN)
+$(VIBE_OBJ): $(DUB_BIN)
+	$(DUB_BIN) --compiler=$(DC)
+
+$(DUB_BIN):
+	cd vendor/dub && \
+	$(DUB_BUILD_SCRIPT)
 
 .PHONY: clean
 clean:
