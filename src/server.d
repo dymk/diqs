@@ -48,6 +48,11 @@ int main(string[] args)
 			Payload payload = conn.readPayload();
 
 			payload.tryVisit!(
+				(RequestPing req) {
+					conn.writePayload(ResponsePong());
+					logInfo("Client requested Ping");
+				},
+
 				(RequestLoadDbFile req) {
 					logInfo("Got load database request: '%s' (create if not exist: %s)", req.path, req.create_if_not_exist);
 

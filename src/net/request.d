@@ -37,3 +37,8 @@ struct RequestRemoveImage {
 
 	user_id_t user_id;
 }
+
+// Server should return ResponsePong
+struct RequestPing {
+	static type = PayloadType.request_ping;
+}

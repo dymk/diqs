@@ -44,6 +44,9 @@ int main(string[] args)
 		(ResponseFailure r) {
 			logInfo("Responded with error! Code: %d", r.code);
 		},
+		(ResponsePong r) {
+			logInfo("Server: PONG");
+		},
 		() {
 			logError("Unexpected response from server");
 		}
@@ -52,17 +55,11 @@ int main(string[] args)
 	Payload resp;
 
 	while(true) {
-		sleep(dur!"msecs"(100));
+		sleep(dur!"msecs"(1));
 
-		conn.writePayload(RequestLoadDbFile("foo/bar/baz", true));
+		conn.writePayload(RequestPing());
 		resp = conn.readPayload();
 		respHandler(resp);
-
-		conn.writePayload(RequestLoadDbFile("some_other/path", false));
-		resp = conn.readPayload();
-		respHandler(resp);
-
-		conn.writePayload(ResponseSuccess());
 	}
 }
 

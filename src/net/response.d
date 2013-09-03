@@ -19,3 +19,7 @@ struct ResponseFailure {
 
 	uint code;
 }
+
+struct ResponsePong {
+	static type = PayloadType.response_pong;
+}
