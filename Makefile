@@ -42,7 +42,6 @@ VIBE_DIR   := vendor/vibe-d/source
 VIBE_FILES := \
   vendor/vibe-d/source/vibe/core/concurrency.d \
   $(shell find $(VIBE_DIR) -name "*.d" -name 'concurrency.d' -prune -o -type f -printf "%p ")
-$(info $(VIBE_FILES))
 
 VIBE_OBJ   := vibe-d$(OBJ_EXT)
 
