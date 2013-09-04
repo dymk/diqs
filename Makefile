@@ -18,7 +18,7 @@ DEBUG_FLAGS           += -debug -de -gc
 UNITTEST_FLAGS        += -unittest
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
-DC_VENDOR_FLAGS = -O -release -noboundscheck
+DC_VENDOR_FLAGS := $(RELEASE_FLAGS) $(DC_FLAGS)
 
 # Include msgpack because it's only 1 file.
 SOURCE_FILES := \
