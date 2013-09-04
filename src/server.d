@@ -12,7 +12,6 @@ import std.stdio : writeln, writefln, stderr;
 import std.variant : tryVisit;
 
 import vibe.core.net : listenTCP;
-import vibe.stream.operations : readLine;
 import vibe.core.core : runEventLoop, lowerPrivileges;
 import vibe.core.log;
 
@@ -48,6 +47,11 @@ int main(string[] args)
 			Payload payload = conn.readPayload();
 
 			payload.tryVisit!(
+				(RequestPing req) {
+					conn.writePayload(ResponsePong());
+					logInfo("Client requested Ping");
+				},
+
 				(RequestLoadDbFile req) {
 					logInfo("Got load database request: '%s' (create if not exist: %s)", req.path, req.create_if_not_exist);
 

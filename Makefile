@@ -1,30 +1,28 @@
-DC ?= ldmd2
-
+DC ?= dmd
 
 ifeq (64,$(MODEL))
   DC_FLAGS += -m64
-else
-  # DC_FLAGS += -m32
 endif
 
-# DC_OUT = $(shell $(DC) 2>/dev/null | head -1)
-# ifneq (,$(findstring LDC,$(DC_OUT)))
-#   $(info LDC detected: Appending -op and LARGEADDRESSAWARE flags)
-#   # LDC, for some reason, doens't compile with large addresses in mind.
-#   DC_FLAGS += -L"-LARGEADDRESSAWARE"
-#   DEBUG_FLAGS += -op
-#   UNITTEST_FLAGS += -op
-# endif
+ifeq ($(OS),Windows_NT)
+  OBJ_EXT :=.obj
+  EXE_EXT :=.exe
+else
+  OBJ_EXT :=.o
+  EXE_EXT :=
+endif
 
-RELEASE_FLAGS         += -O -release -noboundscheck -inline -g
+RELEASE_FLAGS         += -O -release -noboundscheck -inline
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 DEBUG_FLAGS           += -debug -de -gc
-UNITTEST_FLAGS        += -unittest -debug -g
+UNITTEST_FLAGS        += -unittest
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
-# Build the import directory string out of the given import directories
-# (append -I to each directory)
-SOURCE_FILES := $(shell ls src/**/*.d) \
+DC_VENDOR_FLAGS = -O -release -noboundscheck
+
+# Include msgpack because it's only 1 file.
+SOURCE_FILES := \
+  $(shell ls src/**/*.d) \
   src/consts.d \
   src/delta_queue.d \
   src/haar.d \
@@ -32,27 +30,62 @@ SOURCE_FILES := $(shell ls src/**/*.d) \
   src/reserved_array.d \
   src/sig.d \
   src/types.d \
-  src/util.d
+  src/util.d \
+  vendor/msgpack-d/src/msgpack.d
 
 SERVER_FILES = src/server.d
 CLIENT_FILES = src/client.d
 
-# VIBE_FILES = $(shell ls vendor/vibe.d/source/vibe/**/*.d)
-# VIBE_OBJ   = vibed.o
+# ====================================================================
+VIBE_DIR   := vendor/vibe-d/source
+# This is a workaround for a DMD bug to exclude vibe/core/concurrency.d
+VIBE_FILES := \
+  vendor/vibe-d/source/vibe/core/concurrency.d \
+  $(shell find $(VIBE_DIR) -name "*.d" -name 'concurrency.d' -prune -o -type f -printf "%p ")
 
-VENDOR_INCLUDES = -Ivendor/vibe.d/source -Ivendor/openssl
-
-SERVER_BIN = server
-CLIENT_BIN = client
-DUB_BIN    = vendor/dub/bin/dub
-DUB_BUILD_SCRIPT = ./build.sh
+VIBE_OBJ   := vibe-d$(OBJ_EXT)
 
 ifeq ($(OS),Windows_NT)
-  SERVER_BIN = server.exe
-  CLIENT_BIN = client.exe
-	DUB_BIN    = vendor/dub/bin/dub.exe
-	DUB_BUILD_SCRIPT = cmd /c build.cmd
+  ifeq (64,$(MODEL))
+    VIBE_LIBS = \
+      $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
+      $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
+  else
+    VIBE_LIBS = \
+      $(VIBE_DIR)/../lib/win-i386/event2.lib \
+      $(VIBE_DIR)/../lib/win-i386/eay.lib \
+      $(VIBE_DIR)/../lib/win-i386/ssl.lib
+  endif
+
+  OS_LIBS := wsock32.lib ws2_32.lib
+else
+  OS_LIBS := -levent -levent_pthreads -lssl -lcrypto
 endif
+# ====================================================================
+
+# ====================================================================
+OPENSSL_DIR = vendor/openssl
+OPENSSL_FILES = \
+  $(OPENSSL_DIR)/deimos/openssl/bio.d
+OPENSSL_OBJ = openssl$(OBJ_EXT)
+# ====================================================================
+
+# ====================================================================
+LIBEVENT_DIR = vendor/libevent
+LIBEVENT_FILES = $(shell ls $(LIBEVENT_DIR)/deimos/**/*.d)
+LIBEVENT_OBJ = libevent$(OBJ_EXT)
+# ====================================================================
+
+SERVER_BIN = server$(EXE_EXT)
+CLIENT_BIN = client$(EXE_EXT)
+
+VENDOR_INCLUDES = -I$(VIBE_DIR) -I$(OPENSSL_DIR) -I$(LIBEVENT_DIR) -Ivendor/msgpack-d/src
+VENDOR_OBJS     = $(VIBE_OBJ) $(OPENSSL_OBJ) $(LIBEVENT_OBJ)
+VENDOR_LIBS     = $(VIBE_LIBS) $(OS_LIBS)
+
+VERSIONS = -version=VibeCustomMain -version=VibeLibeventDriver
+DC_FLAGS += $(VERSIONS)
+DC_VENDOR_FLAGS += $(VERSIONS)
 
 ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN)
 
@@ -81,18 +114,20 @@ unittest_diskio: $(ALL_BIN)
 speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
 speedtest: $(ALL_BIN)
 
-$(SERVER_BIN): $(VIBE_OBJ)
-	$(DC) $(DC_FLAGS) $(SERVER_FILES) $(SOURCE_FILES) $(VIBE_OBJ) $(VENDOR_INCLUDES) -of$(SERVER_BIN)
-	
-$(CLIENT_BIN): $(VIBE_OBJ)
-	$(DC) $(DC_FLAGS) $(CLIENT_FILES) $(SOURCE_FILES) $(VIBE_OBJ) $(VENDOR_INCLUDES) -of$(CLIENT_BIN)
+$(SERVER_BIN): $(VENDOR_OBJS)
+	$(DC) $(DC_FLAGS) $(SOURCE_FILES) $(SERVER_FILES) $(VENDOR_OBJS) $(VENDOR_INCLUDES) $(VENDOR_LIBS) -of$(SERVER_BIN)
 
-$(VIBE_OBJ): $(DUB_BIN)
-	$(DUB_BIN) --compiler=$(DC)
+$(CLIENT_BIN): $(VENDOR_OBJS)
+	$(DC) $(DC_FLAGS) $(CLIENT_FILES) $(SOURCE_FILES) $(VENDOR_OBJS) $(VENDOR_INCLUDES) $(VENDOR_LIBS) -of$(CLIENT_BIN)
 
-$(DUB_BIN):
-	cd vendor/dub && \
-	$(DUB_BUILD_SCRIPT)
+$(VIBE_OBJ): $(OPENSSL_OBJ) $(LIBEVENT_OBJ)
+	$(DC) $(DC_VENDOR_FLAGS) $(VIBE_FILES) $(VENDOR_INCLUDES) $(OPENSSL_OBJ) $(LIBEVENT_OBJ) $(VENDOR_LIBS) -c -of$(VIBE_OBJ)
+
+$(OPENSSL_OBJ):
+	$(DC) $(DC_VENDOR_FLAGS) $(OPENSSL_FILES) -I$(OPENSSL_DIR) -c -of$(OPENSSL_OBJ)
+
+$(LIBEVENT_OBJ):
+	$(DC) $(DC_VENDOR_FLAGS) $(LIBEVENT_FILES) -I$(LIBEVENT_DIR) -c -of$(LIBEVENT_OBJ)
 
 .PHONY: clean
 clean:
