@@ -7,3 +7,6 @@
 [submodule "vendor/openssl"]
 	path = vendor/openssl
 	url = https://github.com/s-ludwig/openssl.git
+[submodule "vendor/libevent"]
+	path = vendor/libevent
+	url = https://github.com/D-Programming-Deimos/libevent.git

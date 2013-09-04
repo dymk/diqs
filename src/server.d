@@ -12,7 +12,6 @@ import std.stdio : writeln, writefln, stderr;
 import std.variant : tryVisit;
 
 import vibe.core.net : listenTCP;
-import vibe.stream.operations : readLine;
 import vibe.core.core : runEventLoop, lowerPrivileges;
 import vibe.core.log;
 

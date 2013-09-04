@@ -163,7 +163,8 @@ if(is(typeof(P.type) == PayloadType))
 		auto packed = msgpack.pack(request);
 		scope(exit) { GC.free(packed.ptr); }
 
-		uint length = packed.length;
+		// Hopefully the server doens't send an object over 4gb
+		uint length = cast(uint)packed.length;
 
 		conn.writeValue!uint(length);
 		conn.write(packed);

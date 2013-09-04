@@ -7,7 +7,6 @@ import std.stdio : writeln, writefln;
 import std.getopt : getopt;
 
 import vibe.core.net : connectTCP;
-import vibe.stream.operations : readLine;
 import vibe.core.core : sleep;
 import vibe.core.log;
 
