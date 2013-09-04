@@ -38,11 +38,7 @@ CLIENT_FILES = src/client.d
 
 # ====================================================================
 VIBE_DIR   := vendor/vibe-d/source
-# This is a workaround for a DMD bug to exclude vibe/core/concurrency.d
-VIBE_FILES := \
-  vendor/vibe-d/source/vibe/core/concurrency.d \
-  $(shell find $(VIBE_DIR) -name "*.d" -name 'concurrency.d' -prune -o -type f -printf "%p ")
-
+VIBE_FILES := $(shell find $(VIBE_DIR) -name "*.d" -type f -printf "%p ")
 VIBE_OBJ   := vibe-d$(OBJ_EXT)
 
 ifeq ($(OS),Windows_NT)
