@@ -67,12 +67,10 @@ VIBE_OBJ := vibe-d$(OBJ_EXT)
 ifeq ($(OS),Windows_NT)
   ifeq (64,$(MODEL))
     VIBE_LIBS := \
-      $(VIBE_DIR)/../lib/win-amd64/libevent.lib \
       $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
       $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
   else
     VIBE_LIBS := \
-      $(VIBE_DIR)/../lib/win-i386/event2.lib \
       $(VIBE_DIR)/../lib/win-i386/eay.lib \
       $(VIBE_DIR)/../lib/win-i386/ssl.lib
   endif
