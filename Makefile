@@ -2,11 +2,19 @@ DC ?= dmd
 
 ifeq (64,$(MODEL))
   DC_FLAGS += -m64
+else
+  DC_FLAGS += -m32
 endif
 
 ifeq ($(OS),Windows_NT)
-  OBJ_EXT :=.obj
   EXE_EXT :=.exe
+  ifneq (,$(findstring 2.063,$(shell $(DC) | head -1)))
+  	$(info Compiler is DMD)
+    OBJ_EXT :=.obj
+  else
+    $(info Compiler is NOT DMD)
+    OBJ_EXT :=.o
+  endif
 else
   OBJ_EXT :=.o
   EXE_EXT :=
@@ -38,23 +46,41 @@ CLIENT_FILES = src/client.d
 
 # ====================================================================
 VIBE_DIR   := vendor/vibe-d/source
-VIBE_FILES := $(shell find $(VIBE_DIR) -name "*.d" -type f -printf "%p ")
-VIBE_OBJ   := vibe-d$(OBJ_EXT)
+# VIBE_FILES := $(shell find $(VIBE_DIR) -name "*.d" -type f -printf "%p ")
+VIBE_FILES := $(shell find \
+  vendor/vibe-d/source/vibe/core \
+  vendor/vibe-d/source/vibe/data \
+  -name '*.d' -printf "%p ") \
+  $(VIBE_DIR)/vibe/utils/hashmap.d \
+  $(VIBE_DIR)/vibe/utils/memory.d \
+  $(VIBE_DIR)/vibe/utils/array.d \
+  $(VIBE_DIR)/vibe/utils/string.d \
+  $(VIBE_DIR)/vibe/inet/path.d \
+  $(VIBE_DIR)/vibe/inet/url.d \
+  $(VIBE_DIR)/vibe/textfilter/urlencode.d \
+  $(VIBE_DIR)/vibe/textfilter/html.d
+
+$(info $(VIBE_FILES))
+
+VIBE_OBJ := vibe-d$(OBJ_EXT)
 
 ifeq ($(OS),Windows_NT)
   ifeq (64,$(MODEL))
-    VIBE_LIBS = \
+    VIBE_LIBS := \
+      $(VIBE_DIR)/../lib/win-amd64/libevent.lib \
       $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
       $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
   else
-    VIBE_LIBS = \
+    VIBE_LIBS := \
       $(VIBE_DIR)/../lib/win-i386/event2.lib \
       $(VIBE_DIR)/../lib/win-i386/eay.lib \
       $(VIBE_DIR)/../lib/win-i386/ssl.lib
   endif
 
-  OS_LIBS := wsock32.lib ws2_32.lib
+  VIBE_VERSIONS := -version=VibeWin32Driver
+  OS_LIBS := wsock32.lib ws2_32.lib user32.lib
 else
+  VIBE_VERSIONS := -version=VibeLibeventDriver
   OS_LIBS := -levent -levent_pthreads -lssl -lcrypto
 endif
 # ====================================================================
@@ -79,7 +105,7 @@ VENDOR_INCLUDES = -I$(VIBE_DIR) -I$(OPENSSL_DIR) -I$(LIBEVENT_DIR) -Ivendor/msgp
 VENDOR_OBJS     = $(VIBE_OBJ) $(OPENSSL_OBJ) $(LIBEVENT_OBJ)
 VENDOR_LIBS     = $(VIBE_LIBS) $(OS_LIBS)
 
-VERSIONS = -version=VibeCustomMain -version=VibeLibeventDriver
+VERSIONS = -version=VibeCustomMain $(VIBE_VERSIONS)
 DC_FLAGS += $(VERSIONS)
 DC_VENDOR_FLAGS += $(VERSIONS)
 
