@@ -8,7 +8,7 @@ endif
 
 ifeq ($(OS),Windows_NT)
   EXE_EXT :=.exe
-  ifneq (,$(findstring 2.063,$(shell $(DC) | head -1)))
+  ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
   	$(info Compiler is DMD)
     OBJ_EXT :=.obj
   else
@@ -26,7 +26,7 @@ DEBUG_FLAGS           += -debug -de -gc
 UNITTEST_FLAGS        += -unittest
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
-DC_VENDOR_FLAGS := $(RELEASE_FLAGS) $(DC_FLAGS)
+DC_VENDOR_FLAGS = $(DC_FLAGS)
 
 # Include msgpack because it's only 1 file.
 SOURCE_FILES := \
@@ -60,8 +60,6 @@ VIBE_FILES := $(shell find \
   $(VIBE_DIR)/vibe/textfilter/urlencode.d \
   $(VIBE_DIR)/vibe/textfilter/html.d
 
-$(info $(VIBE_FILES))
-
 VIBE_OBJ := vibe-d$(OBJ_EXT)
 
 ifeq ($(OS),Windows_NT)
@@ -71,12 +69,13 @@ ifeq ($(OS),Windows_NT)
       $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
   else
     VIBE_LIBS := \
+      $(VIBE_DIR)/../lib/win-i386/event2.lib \
       $(VIBE_DIR)/../lib/win-i386/eay.lib \
       $(VIBE_DIR)/../lib/win-i386/ssl.lib
   endif
 
-  VIBE_VERSIONS := -version=VibeWin32Driver
-  OS_LIBS := wsock32.lib ws2_32.lib user32.lib
+  VIBE_VERSIONS := -version=VibeLibeventDriver
+  # OS_LIBS := wsock32.lib ws2_32.lib user32.lib
 else
   VIBE_VERSIONS := -version=VibeLibeventDriver
   OS_LIBS := -levent -levent_pthreads -lssl -lcrypto
