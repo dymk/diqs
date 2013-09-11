@@ -1,25 +1,42 @@
 module net.response;
 
 import types;
+import image_db.all : MemDb, FileDb;
 import net.payload;
 
 struct ResponseDbInfo {
-	static type = PayloadType.response_db_info;
+	this(user_id_t id, MemDb _db) {
+		this.db = DbInfo(id, _db);
+	}
 
-	string path;
-	uint num_images;
+	this(user_id_t id, FileDb _db) {
+		this.db = DbInfo(id, _db);
+	}
+
+	DbInfo db;
 }
 
-struct ResponseSuccess {
-	static type = PayloadType.response_success;
+struct ResponseSuccess {}
+
+struct ResponseImageAdded {
+	user_id_t db_id;
+	uint num_images;
+
+	user_id_t user_id;
 }
 
 struct ResponseFailure {
-	static type = PayloadType.response_failure;
-
 	uint code;
 }
 
-struct ResponsePong {
-	static type = PayloadType.response_pong;
+struct ResponsePong {}
+
+struct ResponseVersion {
+	int major;
+	int minor;
+	int patch;
+}
+
+struct ResponseListDatabases {
+	DbInfo[] databases;
 }

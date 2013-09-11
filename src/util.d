@@ -15,7 +15,7 @@ import std.container : BinaryHeap, heapify;
 import std.math : abs;
 
 //version = BinaryHeapLC;
-// Seems that PartialSort is a few percent faster. 
+// Seems that PartialSort is a few percent faster.
 version = PartialSort;
 
 version(PartialSort) {
@@ -155,3 +155,51 @@ version(FullSort)
 	}
 }
 
+string snakeToPascalCase(string snake_case) {
+	import std.array : split;
+	import std.string : capitalize;
+
+	string[] parts = snake_case.split("_");
+	string ret = "";
+
+	foreach(part; parts) {
+		ret ~= capitalize(part);
+	}
+
+	return ret;
+}
+
+unittest {
+	static assert("".snakeToPascalCase() == "");
+	static assert("foo_bar_baz".snakeToPascalCase() == "FooBarBaz");
+	static assert("FooBarBaz".snakeToPascalCase() == "FooBarBaz");
+}
+
+string pascalToSnakeCase(string pascal_case) {
+	import std.uni : isUpper;
+	import std.string : toLower;
+	import std.range : array;
+	import std.array : join;
+
+	string[] parts;
+	size_t lastIndex = 0;
+	foreach(index, ch; pascal_case) {
+		if(isUpper(ch) && index != 0) {
+			parts ~= pascal_case[lastIndex..index].toLower();
+			lastIndex = index;
+		}
+	}
+
+	if(lastIndex != pascal_case.length-1) {
+		parts ~= pascal_case[lastIndex .. $].toLower();
+	}
+
+	return parts.join("_");
+}
+
+unittest {
+	static assert("FooBar".pascalToSnakeCase() == "foo_bar");
+	static assert("foo_bar".pascalToSnakeCase() == "foo_bar");
+	static assert("Quux".pascalToSnakeCase() == "quux");
+	static assert("".pascalToSnakeCase() == "");
+}

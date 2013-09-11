@@ -46,6 +46,9 @@ class OnDiskPersistence : PersistenceLayer
 	static class DatabaseNotFoundException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
+	static class DatabaseAlreadyExistsException : OnDiskPersistenceException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
 	static class DatabaseDirtyException : OnDiskPersistenceException {
 		this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is dirty", file, line, next); }
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
@@ -57,15 +60,14 @@ class OnDiskPersistence : PersistenceLayer
 	enum OffsetBucketSizes = OffsetNumImages + uint.sizeof;
 	enum OffsetImageData   = OffsetBucketSizes + (uint.sizeof * NumBuckets);
 
-	static OnDiskPersistence fromFile(string file_path, bool create_if_nonexistant = false)
+	static OnDiskPersistence loadFromFile(string file_path, bool create_if_nonexistant = false)
 	{
-		File db_file;
 
 		if(!exists(file_path)) {
 
 			if(create_if_nonexistant)
 			{
-				db_file = File(file_path, "wb+");
+				File db_file = File(file_path, "wb+");
 				writeBlankDbFile(db_file);
 			}
 			else
@@ -73,12 +75,16 @@ class OnDiskPersistence : PersistenceLayer
 				throw new DatabaseNotFoundException("Database '" ~ file_path ~ "' does not exist");
 			}
 		}
-		else
-		{
-			db_file = File(file_path, "rb+"); // Opens for reading/writing (doens't truncate file)
-		}
 
-		return new OnDiskPersistence(db_file);
+		return new OnDiskPersistence(file_path);
+	}
+
+	static OnDiskPersistence createFromFile(string file_path)
+	{
+		if(exists(file_path)) {
+			throw new DatabaseAlreadyExistsException("Database '" ~ file_path ~ "' already exists");
+		}
+		return loadFromFile(file_path, true);
 	}
 
 	BucketSizes* bucketSizes() {
@@ -161,11 +167,17 @@ class OnDiskPersistence : PersistenceLayer
 		return true;
 	}
 
+	auto path() {
+		return m_path;
+	}
+
 private:
 
-	this(File db_file)
+	this(string db_path)
 	{
-		this.m_db_file = db_file;
+
+		this.m_path = db_path;
+		this.m_db_file = File(db_path, "rb+");
 
 		m_db_file.seek(OffsetMagic);
 		enforce(m_db_file.tell() == OffsetMagic);
@@ -343,6 +355,8 @@ private:
 	scope BucketSizes* m_bucket_sizes;
 	File m_db_file;
 
+	string m_path;
+
 	// Maps a user_it_t to where the image exists on
 	// the disk itself
 	intern_id_t[user_id_t] m_ids_file_map;
@@ -380,7 +394,7 @@ version(unittest) {
 
 	auto getBlankDatabase(string file_path) {
 		assert(!exists(file_path));
-		return OnDiskPersistence.fromFile(test_file_path, true);
+		return OnDiskPersistence.loadFromFile(test_file_path, true);
 	}
 
 	static ~this() {
@@ -533,12 +547,12 @@ unittest {
 unittest {
 	scope(exit) { remove(test_file_path); }
 	{
-		scope OnDiskPersistence db = OnDiskPersistence.fromFile(test_file_path, true);
+		scope OnDiskPersistence db = OnDiskPersistence.loadFromFile(test_file_path, true);
 		assert(db.hasValidHeaders());
 	}
 	// Test that new datbases are written and valid.
 	{
-		scope OnDiskPersistence db = OnDiskPersistence.fromFile(test_file_path);
+		scope OnDiskPersistence db = OnDiskPersistence.loadFromFile(test_file_path);
 		assert(db.hasValidHeaders());
 	}
 }
@@ -558,7 +572,7 @@ unittest {
 	}
 
 	{
-		scope db = OnDiskPersistence.fromFile(test_file_path);
+		scope db = OnDiskPersistence.loadFromFile(test_file_path);
 		auto ret = db.removeImage(3);
 		assert(ret == img3);
 		db.save();
@@ -566,7 +580,7 @@ unittest {
 
 	// And reopening the database yields the same image data
 	{
-		scope db = OnDiskPersistence.fromFile(test_file_path);
+		scope db = OnDiskPersistence.loadFromFile(test_file_path);
 		assert(db.length == 2);
 		assert(equal(db.imageDataIterator(), [img1, img2]));
 	}

@@ -3,13 +3,17 @@ module net.payload;
 import std.exception : enforce, enforceEx;
 import std.variant : Algebraic;
 import std.format : format;
+import std.array : join;
+import std.traits : EnumMembers;
 
 import vibe.core.net : TCPConnection;
 import vibe.core.log;
 
+import util : snakeToPascalCase, pascalToSnakeCase;
 import net.common;
 public import net.response;
 public import net.request;
+public import net.db_info;
 
 /**
  * The basics of a request/response cycle:
@@ -53,33 +57,47 @@ public import net.request;
  * This exists to disambiguate between all payloads sent, so a
  * request will never have the same type header (the first uint sent)
  * as a response.
+ * PayloadVersion is updated when a PayloadType is added or a Payload
+ * variant is modified.
  */
+enum uint PayloadVersion = 1;
 enum PayloadType : ushort {
+	response_image_added,
 	response_db_info,
 	response_success,
 	response_failure,
 	response_pong,
+	response_version,
+	response_list_databases,
 
-	request_load_db_file,
-	request_query_from_file,
-	request_add_image_from_file,
-	request_add_image_from_file_id,
+	request_create_file_db,
+	request_query_from_path,
+	request_list_databases,
+	request_load_file_db,
+	request_add_image_from_path,
+	request_add_image_from_blob,
 	request_remove_image,
+	request_version,
 	request_ping
 }
 
-alias Payload = Algebraic!(
-	ResponseDbInfo,
-	ResponseSuccess,
-	ResponseFailure,
-	ResponsePong,
 
-	RequestPing,
-	RequestLoadDbFile,
-	RequestQueryFromFile,
-	RequestAddImageFromFile,
-	RequestAddImageFromFileId,
-	RequestRemoveImage);
+string[] getPayloadTypesStrings() {
+	string[] ret;
+	foreach(member; __traits(allMembers, PayloadType)) {
+		ret ~=  member.snakeToPascalCase();
+	}
+	return ret;
+}
+
+mixin(`
+	alias Payload = Algebraic!(` ~ getPayloadTypesStrings().join(", ") ~ `);
+`);
+
+// Expands to something like:
+//alias Payload = Algebraic!(
+//	ResponseDbInfo,
+//	RequestAddImagePathToDb);
 
 class PayloadException : Exception {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
@@ -109,17 +127,32 @@ Payload readPayload(TCPConnection conn) {
 	Payload ret;
 
 	final switch(type) with(PayloadType) {
-		mixin(PayloadCase!(response_db_info, ResponseDbInfo));
-		mixin(PayloadCase!(response_success, ResponseSuccess));
-		mixin(PayloadCase!(response_failure, ResponseFailure));
-		mixin(PayloadCase!(response_pong, ResponsePong));
 
-		mixin(PayloadCase!(request_load_db_file, RequestLoadDbFile));
-		mixin(PayloadCase!(request_query_from_file, RequestQueryFromFile));
-		mixin(PayloadCase!(request_add_image_from_file, RequestAddImageFromFile));
-		mixin(PayloadCase!(request_add_image_from_file_id, RequestAddImageFromFileId));
-		mixin(PayloadCase!(request_remove_image, RequestRemoveImage));
-		mixin(PayloadCase!(request_ping, RequestPing));
+		foreach(member; __traits(allMembers, PayloadType)) {
+			mixin("mixin(PayloadCase!(" ~ member ~ ", " ~ member.snakeToPascalCase() ~ "));");
+		}
+
+		// Generates something like:
+		//mixin(PayloadCase!(response_db_info, ResponseDbInfo));
+
+		// Which in turn expands to something like:
+
+		//case response_db_info:
+		//	ResponseDbInfo variant;
+		//	length = conn.readValue!uint();
+		//	buffer = new ubyte[](length);
+
+		//	conn.read(buffer);
+		//	msgpack.unpack(buffer, variant);
+
+		//	ret = variant;
+		//	break;
+
+		// Or, if it's a zero-member variant, something like:
+
+		//case response_success:
+		//	ret = ResponseSuccess();
+		//	break;
 	}
 
 	return ret;
@@ -153,10 +186,14 @@ template PayloadCase(alias PayloadType type, alias Variant)
 }
 
 void writePayload(P)(TCPConnection conn, P request)
-if(is(typeof(P.type) == PayloadType))
 {
 
-	conn.writeValue!PayloadType(P.type);
+	mixin(q{
+		conn.writeValue!PayloadType(PayloadType.} ~ P.stringof.pascalToSnakeCase() ~ q{);
+	});
+
+	// Expands to something like this, if P is ResponseSuccess:
+	// conn.writeValue!PayloadType(PayloadType.response_success);
 
 	static if(P.tupleof.length != 0)
 	{

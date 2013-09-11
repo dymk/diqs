@@ -32,18 +32,22 @@ import consts :
 import query :
   QueryParams;
 
-import persistence_layer.persistence_layer : PersistenceLayer;
 import persistence_layer.on_disk_persistence : OnDiskPersistence;
 
 class FileDb : BaseDb
 {
 
-	static FileDb fromFile(string path, bool create_if_nonexistant = false)
+	static FileDb loadFromFile(string path, bool create_if_nonexistant = false)
 	{
-		return new FileDb(OnDiskPersistence.fromFile(path, create_if_nonexistant));
+		return new FileDb(OnDiskPersistence.loadFromFile(path, create_if_nonexistant));
 	}
 
-	this(PersistenceLayer persist_layer) {
+	static FileDb createFromFile(string path)
+	{
+		return new FileDb(OnDiskPersistence.createFromFile(path));
+	}
+
+	this(OnDiskPersistence persist_layer) {
 		this.persist_layer = persist_layer;
 		this.m_mem_db = new MemDb(this.persist_layer.length);
 		this.m_id_gen = new IdGen!user_id_t;
@@ -142,14 +146,21 @@ class FileDb : BaseDb
 		return persist_layer.imageDataIterator();
 	}
 
+	auto path() {
+		return persist_layer.path();
+	}
+
+	auto dirty() {
+		return persist_layer.dirty();
+	}
+
 private:
 	void queueAddJob(ImageIdSigDcRes img) {
 		persist_layer.appendImage(img);
 	}
 
 	// Path to the database file this is bound to
-	string m_db_path;
-	PersistenceLayer persist_layer;
+	OnDiskPersistence persist_layer;
 	MemDb m_mem_db;
 	IdGen!user_id_t m_id_gen;
 }
@@ -167,7 +178,7 @@ version(unittest)
 
 unittest {
 	scope(exit) { remove(tmp_db_path); }
-	scope f = FileDb.fromFile(tmp_db_path, true);
+	scope f = FileDb.loadFromFile(tmp_db_path, true);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 	auto img2 = imageFromFile(1, "test/cat_a1.jpg");
 
@@ -184,7 +195,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(tmp_db_path); }
-	scope f = FileDb.fromFile(tmp_db_path, true);
+	scope f = FileDb.loadFromFile(tmp_db_path, true);
 	bool thrown = false;
 	try {
 		f.removeImage(0);
@@ -196,7 +207,7 @@ unittest {
 
 unittest {
 	scope(exit) { remove(tmp_db_path); }
-	scope f = FileDb.fromFile(tmp_db_path, true);
+	scope f = FileDb.loadFromFile(tmp_db_path, true);
 	auto img1 = imageFromFile(0, "test/cat_a1.jpg");
 	auto img2 = imageFromFile(1, "test/cat_a2.jpg");
 
@@ -222,14 +233,14 @@ unittest {
 	auto img3 = imageFromFile(3, "test/small_png.png");
 
 	{
-		scope f = FileDb.fromFile(tmp_db_path, true);
+		scope f = FileDb.loadFromFile(tmp_db_path, true);
 		f.addImage(img1);
 		f.addImage(img2);
 		f.addImage(img3);
 	}
 
 	{
-		scope f = FileDb.fromFile(tmp_db_path);
+		scope f = FileDb.loadFromFile(tmp_db_path);
 		assert(equal(f.imageDataIterator(), [img1, img2, img3]));
 	}
 
@@ -242,19 +253,19 @@ unittest {
 	auto img3 = imageFromFile(3, "test/small_png.png");
 
 	{
-		scope f = FileDb.fromFile(tmp_db_path, true);
+		scope f = FileDb.loadFromFile(tmp_db_path, true);
 		f.addImage(img1);
 		f.addImage(img2);
 		f.addImage(img3);
 	}
 
 	{
-		scope f = FileDb.fromFile(tmp_db_path);
+		scope f = FileDb.loadFromFile(tmp_db_path);
 		f.removeImage(1);
 	}
 
 	{
-		scope f = FileDb.fromFile(tmp_db_path);
+		scope f = FileDb.loadFromFile(tmp_db_path);
 		assert(equal(f.imageDataIterator(), [img1, img3]));
 	}
 
