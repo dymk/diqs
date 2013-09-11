@@ -1,13 +1,13 @@
 module net.payload;
 
+import msgpack;
+
 import std.exception : enforce, enforceEx;
 import std.variant : Algebraic;
 import std.format : format;
 import std.array : join;
-import std.traits : EnumMembers;
 
 import vibe.core.net : TCPConnection;
-import vibe.core.log;
 
 import util : snakeToPascalCase, pascalToSnakeCase;
 import net.common;

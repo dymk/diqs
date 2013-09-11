@@ -3,8 +3,6 @@ module net.db_info;
 import types;
 import image_db.all : BaseDb, FileDb, MemDb;
 
-import std.variant;
-
 struct DbInfo {
 	enum Type {
 		Mem,

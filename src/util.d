@@ -172,7 +172,6 @@ string snakeToPascalCase(string snake_case) {
 unittest {
 	static assert("".snakeToPascalCase() == "");
 	static assert("foo_bar_baz".snakeToPascalCase() == "FooBarBaz");
-	static assert("FooBarBaz".snakeToPascalCase() == "FooBarBaz");
 }
 
 string pascalToSnakeCase(string pascal_case) {

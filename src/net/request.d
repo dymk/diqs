@@ -1,7 +1,6 @@
 module net.request;
 
 import types;
-import net.payload;
 
 struct RequestCreateFileDb {
 	string db_path;

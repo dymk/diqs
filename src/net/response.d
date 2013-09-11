@@ -2,7 +2,7 @@ module net.response;
 
 import types;
 import image_db.all : MemDb, FileDb;
-import net.payload;
+import net.db_info : DbInfo;
 
 struct ResponseDbInfo {
 	this(user_id_t id, MemDb _db) {
