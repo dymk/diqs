@@ -23,17 +23,20 @@ endif
 RELEASE_FLAGS         += -O -release -noboundscheck -inline
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 DEBUG_FLAGS           += -debug -de -gc
-UNITTEST_FLAGS        += -unittest
+UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
 SERVER_FILES = src/server.d
 CLIENT_FILES = src/client.d
+TEST_RUNNER_FILES = src/test_runner.d
 
 SERVER_OBJ = server$(OBJ_EXT)
 CLIENT_OBJ = client$(OBJ_EXT)
+TEST_RUNNER_OBJ = test_runner$(OBJ_EXT)
 
 SERVER_BIN = server$(EXE_EXT)
 CLIENT_BIN = client$(EXE_EXT)
+TEST_RUNNER_BIN = test_runner$(EXE_EXT)
 
 DIQS_DIR   := src
 DIQS_OBJ   := diqs$(OBJ_EXT)
@@ -119,29 +122,42 @@ release: $(ALL_BIN)
 
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
-unittest: $(ALL_BIN)
-	$(ALL_BIN)
+unittest: $(TEST_RUNNER_BIN)
+	$(TEST_RUNNER_BIN)
 
 .PHONY: unittest_diskio
 unittest_diskio: DC_FLAGS += $(UNITTEST_DISKIO_FLAGS)
-unittest_diskio: $(ALL_BIN)
-	$(ALL_BIN)
+unittest_diskio: $(TEST_RUNNER_BIN)
+	$(TEST_RUNNER_BIN)
 
 .PHONY: speedtest
 speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
-speedtest: $(ALL_BIN)
+speedtest: $(TEST_RUNNER_BIN)
 
+# ==============================================================================
 $(SERVER_BIN): $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
 	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(SERVER_BIN)
 
 $(SERVER_OBJ): $(SERVER_FILES)
 	$(DC) $(INCLUDE_DIRS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
+# ==============================================================================
 
+# ==============================================================================
 $(CLIENT_BIN): $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
 	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(CLIENT_BIN)
 
 $(CLIENT_OBJ): $(CLIENT_FILES)
 	$(DC) $(INCLUDE_DIRS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
+# ==============================================================================
+
+# ==============================================================================
+$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
+	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(TEST_RUNNER_BIN)
+
+$(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
+	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
+# ==============================================================================
+
 
 $(PAYLOAD_OBJ): $(PAYLOAD_FILES)
 	$(DC) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)

@@ -93,7 +93,7 @@ int main(string[] args)
 				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
 			},
 			(ResponseFailure r) {
-				writefln("Failure | %d", r.code);
+				writefln("Failure | %s", r.code);
 			}
 		)();
 	}
@@ -106,12 +106,12 @@ int main(string[] args)
 
 		conn.writePayload(req);
 		conn.readPayload().tryVisit!(
-			(ResponseDbInfo resp) {
+			(ResponseDbInfo r) {
 				writeln("Loaded database: ");
-				printDbInfo(resp.db);
+				printDbInfo(r.db);
 			},
-			(ResponseFailure resp) {
-				writefln("Failure | %d", resp.code);
+			(ResponseFailure r) {
+				writefln("Failure | %s", r.code);
 			}
 		)();
 	}

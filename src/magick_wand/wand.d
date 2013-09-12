@@ -127,11 +127,12 @@ class MagickWand {
 			}
 		}
 
-		bool ret = this.wandptr.MagickImportImagePixels(
+		bool ret = this.wandPtr.MagickImportImagePixels(
 			x, y, cols, rows, "RGB".toStringz(),
 			StorageType.CharPixel, pxbuffer.ptr);
 
-		return ret;
+		// ret == false means success
+		return ret == MagickFalse;
 	}
 
 	// Flyweight pattern to avoid needless allocations
@@ -157,7 +158,6 @@ private:
 	WandPtr wandPtr = null;
 }
 
-version(none) {
 // isMagickWand
 unittest {
 	scope wand = new MagickWand;
@@ -210,4 +210,9 @@ unittest {
 		assert(p == RGB(255, 255, 255));
 	}
 }
+
+// importImagePixelsFlat
+unittest {
+	scope wand = new MagickWand;
+	assert(wand.importImagePixelsFlat(1, 3, [RGB(0, 0, 0), RGB(0, 0, 0), RGB(0, 0, 0)]));
 }

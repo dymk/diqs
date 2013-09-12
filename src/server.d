@@ -101,8 +101,7 @@ int main(string[] args)
 		}
 
 
-		void handleoOpeningFileDatabase(R)(R req)
-		if(is(R == RequestCreateFileDb) || is(R == RequestLoadFileDb))
+		void handleOpeningFileDatabase(R)(R req)
 		{
 			logInfo("Got create/load database request: '%s'", req.db_path);
 
@@ -111,15 +110,16 @@ int main(string[] args)
 				return;
 			}
 
-			static if(is(R == RequestCreateFileDb)) {
+			static if(is(R == RequestCreateFileDb))
+			{
 				FileDb db = FileDb.createFromFile(req.db_path);
 			}
-			else static if(is(R == RequestLoadFileDb)) {
+			else static if(is(R == RequestLoadFileDb))
+			{
 				FileDb db = FileDb.loadFromFile(req.db_path, req.create_if_not_exist);
 			}
-			else {
+			else
 				static assert(false);
-			}
 
 			auto db_id = id_gen.next();
 			databases[db_id] = db;
@@ -194,11 +194,12 @@ int main(string[] args)
 					handleRequestPing,
 					handleRequestVersion,
 					handleRequestListDatabases,
-					handleoOpeningFileDatabase!RequestLoadFileDb,
-					handleoOpeningFileDatabase!RequestCreateFileDb,
+					handleOpeningFileDatabase!RequestLoadFileDb,
+					handleOpeningFileDatabase!RequestCreateFileDb,
 					handleAddImageFromPath);
 			}
 			catch(Exception e) {
+				logError("Caught exception: %s (msg: %s)", e, e.msg);
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.UnknownException));
 			}
 		}
