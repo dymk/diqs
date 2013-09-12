@@ -34,6 +34,11 @@ interface BaseDb
 	 */
 	user_id_t addImage(in ImageIdSigDcRes);
 
+	final user_id_t addImage(in ImageSigDcRes img, user_id_t user_id) {
+		ImageIdSigDcRes id_img = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+		return addImage(id_img);
+	}
+
 	/**
 	 * This version does the same as the previous, but the database
 	 * implementation will decide on the user_id to assign to the
