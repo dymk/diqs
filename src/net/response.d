@@ -20,13 +20,30 @@ struct ResponseSuccess {}
 
 struct ResponseImageAdded {
 	user_id_t db_id;
-	uint num_images;
-
-	user_id_t user_id;
+	user_id_t image_id;
 }
 
 struct ResponseFailure {
-	uint code;
+	enum Code : ubyte {
+
+		// Loaded database errors
+		DbAlreadyLoaded,
+		DbNotFound,
+
+		// Image signature generation errors
+		CantOpenFile,
+		InvalidImage,
+		CantResizeImage,
+		CantExportPixels,
+
+		// Signature insertion into DB errors
+		AlreadyHaveId,
+
+		// All else
+		UnknownException
+	}
+
+	Code code;
 }
 
 struct ResponsePong {}

@@ -73,14 +73,14 @@ int main(string[] args)
 		writeln();
 	}
 
-	void addImage(string image_path, user_id_t db_id, user_id_t img_id, bool gen_img_id) {
+	void addImage(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
 		RequestAddImageFromPath req;
 		req.image_path = image_path;
 		req.db_id = db_id;
 
-		if(gen_img_id) {
+		if(gen_image_id) {
 			req.generate_id = true;
-			req.user_id = img_id;
+			req.image_id = image_id;
 		} else {
 			req.generate_id = false;
 		}
@@ -90,7 +90,7 @@ int main(string[] args)
 
 		resp.tryVisit!(
 			(ResponseImageAdded r) {
-				writefln("Success | ID: %5d");
+				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
 			},
 			(ResponseFailure r) {
 				writefln("Failure | %d", r.code);
@@ -161,7 +161,7 @@ int main(string[] args)
 		}
 
 		else if(command == "addImage") {
-			if(cmd_parts.length != 3 || cmd_parts.length != 4) {
+			if(cmd_parts.length < 3 || cmd_parts.length > 4) {
 				writeln("addImage requires 2 or 3 arguments");
 				continue;
 			}
@@ -173,10 +173,10 @@ int main(string[] args)
 			formattedRead(cmd_parts[2], "%d", &db_id);
 
 			if(cmd_parts.length == 4) {
-				user_id_t img_id;
+				user_id_t image_id;
 				formattedRead(cmd_parts[3], "%d", &image_path);
 
-				addImage(image_path, db_id, img_id, false);
+				addImage(image_path, db_id, image_id, false);
 			} else {
 				addImage(image_path, db_id, 0, true);
 			}
@@ -195,9 +195,6 @@ void printCommands() {
 
   lsDbs
     List the databases available on the server
-
-  lsSelected
-    List the client's selected databases for querying
 
   loadFileDb PATH
     Loads a file database on the server at PATH. Fails if the database

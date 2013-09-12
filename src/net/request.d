@@ -25,7 +25,7 @@ struct RequestAddImageFromBlob {
 	// generated for the user. Else, the ID provided by the
 	// user will be tried to be used.
 	bool generate_id = false;
-	user_id_t user_id;
+	user_id_t image_id;
 
 	// Image blob data.
 	ubyte[] image_bytes;
@@ -35,14 +35,14 @@ struct RequestAddImageFromPath {
 	user_id_t db_id;
 
 	bool generate_id = false;
-	user_id_t user_id;
+	user_id_t image_id;
 
 	string image_path;
 }
 
 struct RequestRemoveImage {
 	user_id_t database_id;
-	user_id_t user_id;
+	user_id_t image_id;
 }
 
 struct RequestPing {}

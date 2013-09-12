@@ -1,6 +1,7 @@
 module server;
 
 import types;
+import sig;
 
 import net.payload;
 import net.common;
@@ -106,7 +107,7 @@ int main(string[] args)
 			logInfo("Got create/load database request: '%s'", req.db_path);
 
 			if(fileDbIsLoaded(req.db_path)) {
-				conn.writePayload(ResponseFailure(2));
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbAlreadyLoaded));
 				return;
 			}
 
@@ -127,29 +128,79 @@ int main(string[] args)
 		}
 
 		void handleAddImageFromPath(RequestAddImageFromPath req) {
+			logTrace("Got add image from path request: %s: %s (gen id? %s, id: %d)", req.db_id, req.image_path, req.generate_id, req.image_id);
 
 			DbType* db = req.db_id in databases;
 			if(db is null) {
-				conn.writePayload(ResponseFailure(2));
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbNotFound));
 				return;
 			}
 
-			logTrace("Got add image from path request: %s: %s", req.db_id, req.image_path);
+			void addImage(BaseDb bdb) {
+				ImageSigDcRes image_data;
+				try {
+				 image_data = ImageSigDcRes.fromFile(req.image_path);
+				}
 
-			// TODO: Finish up this logic.
-			assert(false);
+				// Todo: Clean up exception catching code. There has to be a better way of
+				// mapping exceptions to a response code, and returning from the function
+				// early.
+				catch(sig.CantOpenFileException e) {
+					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantOpenFile));
+					return;
+				}
+				catch(sig.InvalidImageException e) {
+					conn.writePayload(ResponseFailure(ResponseFailure.Code.InvalidImage));
+					return;
+				}
+				catch(sig.CantResizeImageException e) {
+					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantResizeImage));
+					return;
+				}
+				catch(sig.CantExportPixelsException e) {
+					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantExportPixels));
+					return;
+				}
+
+				user_id_t image_id;
+				if(req.generate_id) {
+					image_id = bdb.nextId();
+				} else {
+					image_id = req.image_id;
+				}
+
+				try {
+					bdb.addImage(image_data, image_id);
+				}
+				catch(BaseDb.AlreadyHaveIdException) {
+					conn.writePayload(ResponseFailure(ResponseFailure.Code.AlreadyHaveId));
+					return;
+				}
+
+				conn.writePayload(ResponseImageAdded(req.db_id, image_id));
+			}
+
+			(*db).visit!(
+				(FileDb fdb) { addImage(fdb); },
+				(MemDb mdb) { addImage(mdb); }
+			)();
 		}
 
 		while(conn.connected) {
 			Payload payload = conn.readPayload();
 
-			payload.tryVisit!(
-				handleRequestPing,
-				handleRequestVersion,
-				handleRequestListDatabases,
-				handleoOpeningFileDatabase!RequestLoadFileDb,
-				handleoOpeningFileDatabase!RequestCreateFileDb,
-				handleAddImageFromPath);
+			try {
+				payload.tryVisit!(
+					handleRequestPing,
+					handleRequestVersion,
+					handleRequestListDatabases,
+					handleoOpeningFileDatabase!RequestLoadFileDb,
+					handleoOpeningFileDatabase!RequestCreateFileDb,
+					handleAddImageFromPath);
+			}
+			catch(Exception e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.UnknownException));
+			}
 		}
 	}
 
