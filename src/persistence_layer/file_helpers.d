@@ -1,36 +1,39 @@
 module persistence_layer.file_helpers;
 
-import std.stdio : File;
-
+import vibe.core.file :
+  existsFile,
+  openFile,
+  FileMode,
+  FileStream;
 
 // Helper functions for reading and writing
 // values of various sizes to a file
-File writeUlong(File file, ulong val) {
+FileStream writeUlong(FileStream file, ulong val) {
 	return writeValue!ulong(file, val);
 }
 
-File writeUint(File file, uint val) {
+FileStream writeUint(FileStream file, uint val) {
 	return writeValue!uint(file, val);
 }
 
-uint readUint(File file) {
+uint readUint(FileStream file) {
 	return readValue!uint(file);
 }
 
-ulong readUlong(File file) {
+ulong readUlong(FileStream file) {
 	return readValue!ulong(file);
 }
 
-File writeValue(T)(File file, T val) {
+FileStream writeValue(T)(FileStream file, T val) {
 	ubyte[T.sizeof] val_bytes = *(cast(ubyte[T.sizeof]*)(&val));
-	file.rawWrite(val_bytes);
+	file.write(val_bytes);
 	return file;
 }
 
-T readValue(T)(File file) {
+T readValue(T)(FileStream file) {
 	T val;
 	ubyte[T.sizeof] val_bytes;
-	file.rawRead(val_bytes);
+	file.read(val_bytes);
 	val = *(cast(T*)val_bytes.ptr);
 	return val;
 }
@@ -52,49 +55,49 @@ version(unittest) {
 }
 
 unittest {
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUint(10);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 
 	uint test = a.readUint();
 	assert(test == 10);
 }
 
 unittest {
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUlong(4598741);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 
 	ulong test = a.readUlong();
 	assert(test == 4598741);
 }
 
 unittest {
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUlong(4598741);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 
 	ulong test = a.readUlong();
 	assert(test == 4598741);
 }
 
 unittest {
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
@@ -102,7 +105,7 @@ unittest {
 	a.writeValue!float(foo);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 
 	float test = a.readValue!float();
 	assert(test == foo);
@@ -114,13 +117,13 @@ unittest {
 	}
 	Foo foo = { 42091.6190246420913190246420913190246 };
 
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 
 	a.writeValue(foo);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { a.close(); }
 	assert(a.readValue!Foo() == foo);
 }
@@ -146,13 +149,13 @@ unittest {
 	f.f = 765342.642091024264;
 	f.d = -8674209024783624703276453.240937024387624075224746320739072436;
 
-	File a = File(test_file_path, "wb");
+	FileStream a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { remove(test_file_path); }
 
 	a.writeValue(f);
 	a.close();
 
-	a = File(test_file_path, "rb");
+	a = openFile(test_file_path, FileMode.readWrite);
 	scope(exit) { a.close(); }
 
 	Foo test = a.readValue!Foo();
@@ -167,14 +170,14 @@ unittest {
 
 unittest {
 	 ImageIdSigDcRes image = imageFromFile(1, "test/cat_a2.jpg");
-	 File a = File(test_file_path, "wb");
+	 FileStream a = openFile(test_file_path, FileMode.readWrite);
 	 scope(exit) { remove(test_file_path); }
 	 scope(exit) { a.close(); }
 
 	 a.writeValue!ImageIdSigDcRes(image);
 	 a.close();
 
-	 a = File(test_file_path, "rb");
+	 a = openFile(test_file_path, FileMode.readWrite);
 
 	 auto test = a.readValue!ImageIdSigDcRes();
 	 assert(test == image);

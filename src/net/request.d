@@ -1,6 +1,7 @@
 module net.request;
 
 import types;
+import magick_wand.colorspace : RGB;
 
 struct RequestCreateFileDb {
 	string db_path;
@@ -18,19 +19,6 @@ struct RequestQueryFromPath {
 	bool is_sketch = false;
 }
 
-struct RequestAddImageFromBlob {
-	user_id_t db_id;
-
-	// If generate_id is true, then a unique ID will be
-	// generated for the user. Else, the ID provided by the
-	// user will be tried to be used.
-	bool generate_id = false;
-	user_id_t image_id;
-
-	// Image blob data.
-	ubyte[] image_bytes;
-}
-
 struct RequestAddImageFromPath {
 	user_id_t db_id;
 
@@ -38,6 +26,17 @@ struct RequestAddImageFromPath {
 	user_id_t image_id;
 
 	string image_path;
+}
+
+struct RequestAddImageFromPixels {
+	user_id_t db_id;
+
+	bool generate_id = false;
+	user_id_t image_id;
+
+	uint width;
+	uint height;
+	RGB[] pixels;
 }
 
 struct RequestRemoveImage {

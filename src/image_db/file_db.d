@@ -7,8 +7,13 @@ module image_db.file_db;
 import std.typecons : Tuple;
 import std.exception : enforce;
 import std.container : Array;
-import std.file : exists;
 import core.memory : GC;
+
+import vibe.core.file :
+  existsFile,
+  openFile,
+  FileMode,
+  FileStream;
 
 import types :
   user_id_t,
@@ -129,10 +134,8 @@ class FileDb : BaseDb
 	}
 
 	~this() {
-		if(persist_layer.isOpen()) {
-			save();
-			close();
-		}
+		save();
+		close();
 	}
 
 	user_id_t nextId() {

@@ -3,11 +3,34 @@ module magick_wand.wand;
 import magick_wand.all;
 
 import std.string;
-import std.exception : enforce;
+import std.exception : enforce, enforceEx;
 import core.memory : GC;
+
+class WandException : Exception {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class InvalidImageException : WandException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class CantResizeImageException : WandException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
+final class CantExportPixelsException : WandException {
+	this(string message = "Couldn't export image pixels", string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
+final class CantImportPixelsException : WandException {
+	this(string message = "Couldn't import image pixels", string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
+final class NonExistantFileException : WandException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
 
 // "magick-wand-private.h", line 33
 class MagickWand {
+
+	// somethingEx functions are throwing functions, which
+	// enforce the success of the underlying function they call.
+
 	this()
 	{
 		wandPtr = NewMagickWand();
@@ -18,6 +41,13 @@ class MagickWand {
 		DestroyMagickWand(wandPtr);
 	}
 
+	auto readImageEx(string fname)
+	{
+		import std.file : exists;
+		if(!exists(fname))
+			throw new NonExistantFileException("File " ~ fname ~ " does not exist");
+		return enforceEx!InvalidImageException(readImage(fname), "Couldn't open image file: " ~ fname);
+	}
 	auto readImage(string fname)
 	{
 		return this.wandPtr.MagickReadImage(fname.toStringz());
@@ -27,6 +57,11 @@ class MagickWand {
 	auto imageHeight()  { return this.wandPtr.MagickGetImageHeight(); }
 	auto clear()        { return this.wandPtr.ClearMagickWand(); }
 	auto isMagickWand() { return this.wandPtr.IsMagickWand(); }
+
+	auto scaleImageEx(size_t cols, size_t rows)
+	{
+		return enforceEx!CantResizeImageException(scaleImage(cols, rows), "Couldn't resize image");
+	}
 	auto scaleImage(size_t cols, size_t rows)
 	{
 		return this.wandPtr.MagickScaleImage(cols, rows);
@@ -34,6 +69,18 @@ class MagickWand {
 	auto resizeImage(size_t cols, size_t rows, FilterTypes filter, double blur)
 	{
 		return this.wandPtr.MagickResizeImage(cols, rows, filter, blur);
+	}
+
+	auto exportImagePixelsEx(T)(
+		size_t x = 0, size_t y = 0)
+	{
+		return enforceEx!CantExportPixelsException(exportImagePixels!(T)(x, y));
+	}
+
+	T[][] exportImagePixelsEx(T)(
+		size_t x, size_t y, size_t cols, size_t rows)
+	{
+		return enforceEx!CantExportPixelsException(exportImagePixels!(T)(x, y, cols, rows));
 	}
 
 	T[][] exportImagePixels(T)(
@@ -58,6 +105,18 @@ class MagickWand {
 			}
 			return mat;
 		}
+	}
+
+	T[] exportImagePixelsFlatEx(T)(
+		size_t x = 0, size_t y = 0)
+	{
+		return enforceEx!CantExportPixelsException(exportImagePixelsFlat!(T)(x, y));
+	}
+
+	T[] exportImagePixelsFlatEx(T)(
+		size_t x, size_t y, size_t cols, size_t rows)
+	{
+		return enforceEx!CantExportPixelsException(exportImagePixelsFlat!(T)(x, y, cols, rows));
 	}
 
 	T[] exportImagePixelsFlat(T)(
@@ -98,6 +157,17 @@ class MagickWand {
 			GC.free(pxbuffer.ptr);
 			return null;
 		}
+	}
+
+	bool importImagePixelsFlatEx(T)(
+		size_t cols, size_t rows, T[] pixels
+	) {
+		return enforceEx!CantImportPixelsException(importImagePixelsFlat!T(cols, rows, pixels));
+	}
+
+	bool importImagePixelsFlatEx(T)(size_t x, size_t y, size_t cols, size_t rows, T[] pixels)
+	{
+		return enforceEx!CantImportPixelsException(importImagePixelsFlat!T(x, y, cols, rows, pixels));
 	}
 
 	bool importImagePixelsFlat(T)(size_t cols, size_t rows, T[] pixels) {
@@ -151,6 +221,13 @@ class MagickWand {
 	static disposeWand(MagickWand wand) {
 		wand.clear();
 		disposedWands ~= wand;
+	}
+
+	// Helper method to create a wand from a file image
+	static fromFile(string file) {
+		auto wand = getWand();
+		wand.readImageEx(file);
+		return wand;
 	}
 
 private:

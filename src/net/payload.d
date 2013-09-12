@@ -75,7 +75,7 @@ enum PayloadType : ushort {
 	request_list_databases,
 	request_load_file_db,
 	request_add_image_from_path,
-	request_add_image_from_blob,
+	request_add_image_from_pixels,
 	request_remove_image,
 	request_version,
 	request_ping
