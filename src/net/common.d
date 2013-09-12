@@ -1,19 +1,12 @@
 module net.common;
 
-import types;
-import net.request;
-import net.response;
-
 import vibe.core.net : TCPConnection;
-import vibe.core.log;
 
 import std.exception : enforce, enforceEx;
 import std.variant : Algebraic;
 import std.conv : to;
 import std.format : format;
 import core.memory : GC;
-
-import msgpack;
 
 static immutable DefaultHost = "127.0.0.1";
             enum DefaultPort = 9548;

@@ -36,13 +36,13 @@ class MagickWand {
 		return this.wandPtr.MagickResizeImage(cols, rows, filter, blur);
 	}
 
-	auto exportImagePixels(T)(
+	T[][] exportImagePixels(T)(
 		size_t x = 0, size_t y = 0)
 	{
 		return exportImagePixels!(T)(x, y, this.imageWidth(), this.imageHeight());
 	}
 
-	auto exportImagePixels(T)(
+	T[][] exportImagePixels(T)(
 		size_t x, size_t y, size_t cols, size_t rows)
 	{
 		auto height = rows - y;
@@ -60,21 +60,21 @@ class MagickWand {
 		}
 	}
 
-	auto exportImagePixelsFlat(T)(
+	T[] exportImagePixelsFlat(T)(
 		size_t x = 0, size_t y = 0)
 	{
 		return exportImagePixelsFlat!(T)(x, y, this.imageWidth(), this.imageHeight());
 	}
 
-	auto exportImagePixelsFlat(T)(
+	T[] exportImagePixelsFlat(T)(
 		size_t x, size_t y, size_t cols, size_t rows)
 	{
+		static assert(T.sizeof == RGB.sizeof);
+
 		enforce(x <= cols);
 		enforce(y <= rows);
 		enforce(x + cols <= this.imageWidth());
 		enforce(y + rows <= this.imageHeight());
-
-		enforce(T.sizeof == RGB.sizeof);
 
 		auto area = (rows - y)*(cols - x);
 		auto pxbuffer = new RGB[area];
@@ -98,6 +98,40 @@ class MagickWand {
 			GC.free(pxbuffer.ptr);
 			return null;
 		}
+	}
+
+	bool importImagePixelsFlat(T)(size_t cols, size_t rows, T[] pixels) {
+		return importImagePixelsFlat!T(0, 0, cols, rows, pixels);
+	}
+
+	bool importImagePixelsFlat(T)(size_t x, size_t y, size_t cols, size_t rows, T[] pixels)
+	{
+		static assert(T.sizeof == RGB.sizeof);
+
+		enforce(x <= cols);
+		enforce(y <= rows);
+
+		size_t area = (cols - x) * (rows - y);
+		enforce(area == pixels.length);
+
+		static if(is(T == RGB))
+		{
+			auto pxbuffer = pixels;
+		}
+		else
+		{
+			scope pxbuffer = new RGB[pixels.length];
+			foreach(i; 0..pixels.length)
+			{
+				pxbuffer[i] = pixels[i].toRGB();
+			}
+		}
+
+		bool ret = this.wandptr.MagickImportImagePixels(
+			x, y, cols, rows, "RGB".toStringz(),
+			StorageType.CharPixel, pxbuffer.ptr);
+
+		return ret;
 	}
 
 	// Flyweight pattern to avoid needless allocations

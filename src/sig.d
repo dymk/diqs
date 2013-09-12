@@ -26,12 +26,29 @@ import types :
 import haar : haar2d;
 import util : largestCoeffs;
 
-import std.exception : enforce;
+import std.exception : enforceEx;
 import std.algorithm : map, copy, filter;
 import std.range : array;
 import std.string : format;
 import std.stdio : writeln;
+import std.file : exists;
 import core.memory : GC;
+
+class SigException : Exception {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class InvalidImageException : SigException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class CantResizeImageException : SigException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
+final class CantExportPixelsException : SigException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
+final class CantOpenFileException : SigException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
 
 struct CoeffIPair
 {
@@ -117,22 +134,21 @@ struct ImageSigDcRes
 			MagickWand.disposeWand(wand);
 		}
 
-		enforce(wand.readImage(file), "Couldn't read file: " ~ file);
+		enforceEx!CantOpenFileException(exists(file), "File " ~ file ~ " does not exist");
+		enforceEx!InvalidImageException(wand.readImage(file), "Couldn't open image file: " ~ file);
+
 		short
 		  width = cast(res_t)wand.imageWidth(),
 		  height = cast(res_t)wand.imageHeight();
 		ret.res = ImageRes(width, height);
 
-		//enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.CubicFilter, 1.0));
 		if(width != ImageWidth || height != ImageHeight)
 		{
-			enforce(wand.scaleImage(ImageWidth, ImageHeight));
+			enforceEx!CantResizeImageException(wand.scaleImage(ImageWidth, ImageHeight), "Couldn't resize image " ~ file);
 		}
 
-		auto pixels = wand.exportImagePixelsFlat!YIQ();
+		auto pixels = enforceEx!CantExportPixelsException(wand.exportImagePixelsFlat!YIQ(), "Couldn't export the pixels for image " ~ file);
 		scope(exit) { GC.free(pixels.ptr); }
-
-		enforce(pixels);
 
 		scope ychan = pixels.map!(a => cast(coeff_t)a.y).array();
 		scope ichan = pixels.map!(a => cast(coeff_t)a.i).array();
@@ -151,15 +167,17 @@ struct ImageSigDcRes
 		scope qlargest = largestCoeffs(qchan[], NumSigCoeffs, 1);
 
 		auto sig = ImageSig();
+
 		// Add 1 to all of the indexes, because largestCoeff was passed the tail of
 		// the channel, so all coeffs' indexes were shifted left.
 		// If coeff is negative, make the index negative as well.
 		ylargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.y[]);
 		ilargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.i[]);
 		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
+
 		ret.sig = sig;
 
-		//version(assert) {
+		version(assert) {
 			foreach(sig_t s; ret.sig.sigs) {
 				if(filter!(a => a == 0)(s[]).array().length != 0)
 				{
@@ -169,7 +187,7 @@ struct ImageSigDcRes
 					assert(false);
 				}
 			}
-		//}
+		}
 
 		return ret;
 	}

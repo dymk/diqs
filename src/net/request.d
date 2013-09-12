@@ -1,39 +1,52 @@
 module net.request;
 
 import types;
-import net.payload;
 
-struct RequestLoadDbFile {
-	static type = PayloadType.request_load_db_file;
-
-	string path;
-	bool create_if_not_exist;
+struct RequestCreateFileDb {
+	string db_path;
 }
 
-struct RequestQueryFromFile {
-	static type = PayloadType.request_query_from_file;
+struct RequestLoadFileDb {
+	bool create_if_not_exist = false;
+	string db_path;
+}
 
+struct RequestQueryFromPath {
 	string image_path;
 	int num_results;
 	bool ignore_color = false;
 	bool is_sketch = false;
 }
 
-struct RequestAddImageFromFile {
-	static type = PayloadType.request_add_image_from_file;
+struct RequestAddImageFromBlob {
+	user_id_t db_id;
 
-	string image_path;
+	// If generate_id is true, then a unique ID will be
+	// generated for the user. Else, the ID provided by the
+	// user will be tried to be used.
+	bool generate_id = false;
+	user_id_t image_id;
+
+	// Image blob data.
+	ubyte[] image_bytes;
 }
 
-struct RequestAddImageFromFileId {
-	static type = PayloadType.request_add_image_from_file_id;
+struct RequestAddImageFromPath {
+	user_id_t db_id;
+
+	bool generate_id = false;
+	user_id_t image_id;
 
 	string image_path;
-	user_id_t user_id;
 }
 
 struct RequestRemoveImage {
-	static type = PayloadType.request_remove_image;
-
-	user_id_t user_id;
+	user_id_t database_id;
+	user_id_t image_id;
 }
+
+struct RequestPing {}
+
+struct RequestListDatabases {}
+
+struct RequestVersion {}
