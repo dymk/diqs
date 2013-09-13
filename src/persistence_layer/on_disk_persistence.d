@@ -71,7 +71,9 @@ class OnDiskPersistence : PersistenceLayer
 
 			if(create_if_nonexistant)
 			{
+				openFile(file_path, FileMode.createTrunc).close();
 				FileStream db_file = openFile(file_path, FileMode.readWrite);
+				scope(exit) { db_file.close(); }
 				writeBlankDbFile(db_file);
 			}
 			else

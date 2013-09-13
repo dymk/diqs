@@ -28,6 +28,7 @@ import sig :
   ImageDc;
 
 import image_db.base_db : BaseDb, IdGen;
+import image_db.persisted_db : PersistedDb;
 import image_db.mem_db : MemDb;
 import consts :
   ImageArea,
@@ -39,7 +40,7 @@ import query :
 
 import persistence_layer.on_disk_persistence : OnDiskPersistence;
 
-class FileDb : BaseDb
+class FileDb : PersistedDb
 {
 
 	static FileDb loadFromFile(string path, bool create_if_nonexistant = false)
