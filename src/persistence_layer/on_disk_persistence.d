@@ -1,10 +1,14 @@
 module persistence_layer.on_disk_persistence;
 
-import std.stdio : File;
 import std.conv : to;
 import std.container : Array;
-import std.file : exists;
 import std.exception : enforce, enforceEx;
+
+import vibe.core.file :
+  existsFile,
+  openFile,
+  FileMode,
+  FileStream;
 
 import persistence_layer.persistence_layer : PersistenceLayer;
 import persistence_layer.file_helpers;
@@ -43,10 +47,10 @@ class OnDiskPersistence : PersistenceLayer
 	static class InvalidFileException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
-	static class DatabaseNotFoundException : OnDiskPersistenceException {
+	static class DbFileNotFoundException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
-	static class DatabaseAlreadyExistsException : OnDiskPersistenceException {
+	static class DbFileAlreadyExistsException : OnDiskPersistenceException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 	};
 	static class DatabaseDirtyException : OnDiskPersistenceException {
@@ -63,16 +67,16 @@ class OnDiskPersistence : PersistenceLayer
 	static OnDiskPersistence loadFromFile(string file_path, bool create_if_nonexistant = false)
 	{
 
-		if(!exists(file_path)) {
+		if(!existsFile(file_path)) {
 
 			if(create_if_nonexistant)
 			{
-				File db_file = File(file_path, "wb+");
+				FileStream db_file = openFile(file_path, FileMode.readWrite);
 				writeBlankDbFile(db_file);
 			}
 			else
 			{
-				throw new DatabaseNotFoundException("Database '" ~ file_path ~ "' does not exist");
+				throw new DbFileNotFoundException("Database '" ~ file_path ~ "' does not exist");
 			}
 		}
 
@@ -81,8 +85,8 @@ class OnDiskPersistence : PersistenceLayer
 
 	static OnDiskPersistence createFromFile(string file_path)
 	{
-		if(exists(file_path)) {
-			throw new DatabaseAlreadyExistsException("Database '" ~ file_path ~ "' already exists");
+		if(existsFile(file_path)) {
+			throw new DbFileAlreadyExistsException("Database '" ~ file_path ~ "' already exists");
 		}
 		return loadFromFile(file_path, true);
 	}
@@ -115,7 +119,6 @@ class OnDiskPersistence : PersistenceLayer
 	}
 
 	void save() {
-		enforce(isOpen(), "PL file handle is not open.");
 		syncImageData();
 		syncHeaders();
 	}
@@ -155,10 +158,6 @@ class OnDiskPersistence : PersistenceLayer
 		m_db_file.close();
 	}
 
-	bool isOpen() {
-		return m_db_file.isOpen();
-	}
-
 	bool hasValidHeaders() {
 		m_db_file.seek(OffsetMagic);
 		if(m_db_file.readUlong() != Magic)
@@ -177,7 +176,7 @@ private:
 	{
 
 		this.m_path = db_path;
-		this.m_db_file = File(db_path, "rb+");
+		this.m_db_file = openFile(db_path, FileMode.readWrite);
 
 		m_db_file.seek(OffsetMagic);
 		enforce(m_db_file.tell() == OffsetMagic);
@@ -194,7 +193,7 @@ private:
 		foreach(ref int bucket_size; bucket_sizes.sizes)
 		{
 
-			if(m_db_file.eof()) {
+			if(m_db_file.empty()) {
 				throw new InvalidFileException("Database ended short of reading all bucket sizes.");
 			}
 
@@ -353,7 +352,7 @@ private:
 
 	uint m_num_images;
 	scope BucketSizes* m_bucket_sizes;
-	File m_db_file;
+	FileStream m_db_file;
 
 	string m_path;
 
@@ -362,7 +361,7 @@ private:
 	intern_id_t[user_id_t] m_ids_file_map;
 }
 
-private void writeBlankDbFile(File handle)
+private void writeBlankDbFile(FileStream handle)
 {
 	handle.seek(0);
 

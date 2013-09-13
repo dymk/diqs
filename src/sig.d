@@ -34,22 +34,6 @@ import std.stdio : writeln;
 import std.file : exists;
 import core.memory : GC;
 
-class SigException : Exception {
-	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-};
-final class InvalidImageException : SigException {
-	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-};
-final class CantResizeImageException : SigException {
-	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-}
-final class CantExportPixelsException : SigException {
-	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-}
-final class CantOpenFileException : SigException {
-	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-}
-
 struct CoeffIPair
 {
 	coeffi_t index;
@@ -71,6 +55,15 @@ struct ImageSig
 	ref auto y() @property { return sigs[0]; }
 	ref auto i() @property { return sigs[1]; }
 	ref auto q() @property { return sigs[2]; }
+
+	static MagickWand resizeWand(MagickWand wand)
+	{
+		if(wand.imageWidth() != ImageWidth || wand.imageHeight() != ImageHeight)
+		{
+			wand.scaleImageEx(ImageWidth, ImageHeight);
+		}
+		return wand;
+	}
 
 	version(assert)
 	{
@@ -125,29 +118,18 @@ struct ImageSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	static auto fromFile(string file)
+	static auto fromWand(MagickWand wand)
 	{
-		auto ret = ImageSigDcRes();
-
-		auto wand = MagickWand.getWand();
-		scope(exit) {
-			MagickWand.disposeWand(wand);
-		}
-
-		enforceEx!CantOpenFileException(exists(file), "File " ~ file ~ " does not exist");
-		enforceEx!InvalidImageException(wand.readImage(file), "Couldn't open image file: " ~ file);
+		ImageSigDcRes ret;
 
 		short
 		  width = cast(res_t)wand.imageWidth(),
 		  height = cast(res_t)wand.imageHeight();
 		ret.res = ImageRes(width, height);
 
-		if(width != ImageWidth || height != ImageHeight)
-		{
-			enforceEx!CantResizeImageException(wand.scaleImage(ImageWidth, ImageHeight), "Couldn't resize image " ~ file);
-		}
+		ImageSig.resizeWand(wand);
 
-		auto pixels = enforceEx!CantExportPixelsException(wand.exportImagePixelsFlat!YIQ(), "Couldn't export the pixels for image " ~ file);
+		auto pixels = wand.exportImagePixelsFlatEx!YIQ();
 		scope(exit) { GC.free(pixels.ptr); }
 
 		scope ychan = pixels.map!(a => cast(coeff_t)a.y).array();
@@ -181,7 +163,7 @@ struct ImageSigDcRes
 			foreach(sig_t s; ret.sig.sigs) {
 				if(filter!(a => a == 0)(s[]).array().length != 0)
 				{
-					writeln(format("0 coeff found in sig of %s: %s", file, s[]));
+					writeln(format("0 coeff found in sig: %s", s[]));
 					writeln("First set from the chan: ", ychan[0..10]);
 					writeln("DC: ", ret.dc);
 					assert(false);
@@ -190,6 +172,14 @@ struct ImageSigDcRes
 		}
 
 		return ret;
+
+	}
+
+	static auto fromFile(string file)
+	{
+		auto wand = MagickWand.fromFile(file);
+		scope(exit) { MagickWand.disposeWand(wand); }
+		return ImageSigDcRes.fromWand(wand);
 	}
 }
 

@@ -1,6 +1,8 @@
 module client;
 
 import types;
+import magick_wand.wand;
+import sig : ImageSig;
 
 import net.payload;
 import net.common;
@@ -73,9 +75,9 @@ int main(string[] args)
 		writeln();
 	}
 
-	void addImage(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
-		RequestAddImageFromPath req;
-		req.image_path = image_path;
+	// An attempt to DRY up the addImage and addImageRemote functions
+	void setupAddImageRequest(P)(ref P req, user_id_t db_id, user_id_t image_id, bool gen_image_id)
+	{
 		req.db_id = db_id;
 
 		if(gen_image_id) {
@@ -84,6 +86,12 @@ int main(string[] args)
 		} else {
 			req.generate_id = false;
 		}
+	}
+
+	void addImage(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
+		RequestAddImageFromPath req;
+		setupAddImageRequest(req, db_id, image_id, gen_image_id);
+		req.image_path = image_path;
 
 		conn.writePayload(req);
 		Payload resp = conn.readPayload();
@@ -93,7 +101,42 @@ int main(string[] args)
 				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
 			},
 			(ResponseFailure r) {
-				writefln("Failure | %d", r.code);
+				writefln("Failure | %s", r.code);
+			}
+		)();
+	}
+
+	void addImageRemote(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
+		RequestAddImageFromPixels req;
+		setupAddImageRequest(req, db_id, image_id, gen_image_id);
+
+		try {
+			auto wand = MagickWand.fromFile(image_path);
+			scope(exit) { MagickWand.disposeWand(wand); }
+
+			req.width =  cast(uint) wand.imageWidth();
+			req.height = cast(uint) wand.imageHeight();
+
+			ImageSig.resizeWand(wand);
+			req.pixels = wand.exportImagePixelsFlatEx!RGB();
+		}
+		catch(WandException e)
+		{
+			logError("Couldn't process image file %s: %s", image_path, e);
+			return;
+		}
+
+		scope(exit) { GC.free(req.pixels.ptr); }
+
+		conn.writePayload(req);
+		Payload resp = conn.readPayload();
+
+		resp.tryVisit!(
+			(ResponseImageAdded r) {
+				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
+			},
+			(ResponseFailure r) {
+				writefln("Failure | %s", r.code);
 			}
 		)();
 	}
@@ -106,12 +149,12 @@ int main(string[] args)
 
 		conn.writePayload(req);
 		conn.readPayload().tryVisit!(
-			(ResponseDbInfo resp) {
+			(ResponseDbInfo r) {
 				writeln("Loaded database: ");
-				printDbInfo(resp.db);
+				printDbInfo(r.db);
 			},
-			(ResponseFailure resp) {
-				writefln("Failure | %d", resp.code);
+			(ResponseFailure r) {
+				writefln("Failure | %s", r.code);
 			}
 		)();
 	}
@@ -160,9 +203,9 @@ int main(string[] args)
 			genericLoadCreateFileDb!RequestLoadFileDb(db_path);
 		}
 
-		else if(command == "addImage") {
+		else if(command == "addImage" || command == "addImageRemote") {
 			if(cmd_parts.length < 3 || cmd_parts.length > 4) {
-				writeln("addImage requires 2 or 3 arguments");
+				writefln("%s requires 2 or 3 arguments", command);
 				continue;
 			}
 
@@ -172,13 +215,17 @@ int main(string[] args)
 			image_path = cmd_parts[1];
 			formattedRead(cmd_parts[2], "%d", &db_id);
 
-			if(cmd_parts.length == 4) {
-				user_id_t image_id;
-				formattedRead(cmd_parts[3], "%d", &image_path);
+			bool gen_image_id = (cmd_parts.length == 4);
+			user_id_t image_id;
 
-				addImage(image_path, db_id, image_id, false);
+			if(!gen_image_id) {
+				formattedRead(cmd_parts[3], "%d", &image_id);
+			}
+
+			if(command == "addImage") {
+				addImage(image_path, db_id, image_id, gen_image_id);
 			} else {
-				addImage(image_path, db_id, 0, true);
+				addImageRemote(image_path, db_id, image_id, gen_image_id);
 			}
 		}
 
@@ -206,7 +253,14 @@ void printCommands() {
 
   addImage PATH DBID [IMGID]
     Add image at path PATH to the database with id DBID. If IMGID is
-    not specified, then a DB-unique ID is generated for the image.
+    not specified, then a DB-unique ID is generated for the image. Assumes
+    that PATH is accessible to the server.
+
+  addImageRemote PATH DBID [IMGID]
+    Adds an image to the database, like addImage. However, this command is
+    used when the server is on a remote machine without access to the file
+    at PATH, and needs to be transmitted to the server over the network.
+    Resizing is done on the client to conserve network bandwidth.
 `);
 }
 

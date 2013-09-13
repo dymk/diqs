@@ -31,10 +31,14 @@ struct ResponseFailure {
 		DbNotFound,
 
 		// Image signature generation errors
-		CantOpenFile,
+		NonExistantFile,
 		InvalidImage,
 		CantResizeImage,
 		CantExportPixels,
+
+		// FileDb file exceptions
+		DbFileAlreadyExists,
+		DbFileNotFound,
 
 		// Signature insertion into DB errors
 		AlreadyHaveId,

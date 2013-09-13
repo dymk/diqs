@@ -3,6 +3,9 @@ module magick_wand.types;
 alias MagickBooleanType = bool;
 alias WandPtr = void*;
 
+enum MagickTrue = true;
+enum MagickFalse = false;
+
 // "magick/constitute.h", line 25
 enum StorageType {
 	UndefinedPixel,

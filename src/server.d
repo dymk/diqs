@@ -9,6 +9,10 @@ import net.common;
 import image_db.file_db : FileDb;
 import image_db.base_db : IdGen;
 
+import magick_wand.wand;
+
+import persistence_layer.on_disk_persistence;
+
 import std.getopt : getopt;
 import std.stdio : writeln, writefln, stderr;
 import std.variant : Algebraic, tryVisit, visit;
@@ -20,6 +24,13 @@ import vibe.core.log;
 enum VersionMajor = 0;
 enum VersionMinor = 0;
 enum VersionPatch = 1;
+
+class ServerException : Exception {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class DatabaseNotFoundException : ServerException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
 
 alias DbType = Algebraic!(
 	FileDb,
@@ -100,9 +111,7 @@ int main(string[] args)
 			conn.writePayload(ResponseListDatabases(list));
 		}
 
-
-		void handleoOpeningFileDatabase(R)(R req)
-		if(is(R == RequestCreateFileDb) || is(R == RequestLoadFileDb))
+		void handleOpeningFileDatabase(R)(R req)
 		{
 			logInfo("Got create/load database request: '%s'", req.db_path);
 
@@ -111,15 +120,18 @@ int main(string[] args)
 				return;
 			}
 
-			static if(is(R == RequestCreateFileDb)) {
+			static if(is(R == RequestCreateFileDb))
+			{
 				FileDb db = FileDb.createFromFile(req.db_path);
+				logDiagnostic("Created database at path %s", req.db_path);
 			}
-			else static if(is(R == RequestLoadFileDb)) {
+			else static if(is(R == RequestLoadFileDb))
+			{
 				FileDb db = FileDb.loadFromFile(req.db_path, req.create_if_not_exist);
 			}
-			else {
+			else
 				static assert(false);
-			}
+
 
 			auto db_id = id_gen.next();
 			databases[db_id] = db;
@@ -127,63 +139,53 @@ int main(string[] args)
 			conn.writePayload(ResponseDbInfo(db_id, db));
 		}
 
-		void handleAddImageFromPath(RequestAddImageFromPath req) {
-			logTrace("Got add image from path request: %s: %s (gen id? %s, id: %d)", req.db_id, req.image_path, req.generate_id, req.image_id);
+		// Generic add image data from request and image data
+		void addImageData(Req)(ImageSigDcRes image_data, Req req)
+		if(
+			is(Req == RequestAddImageFromPath) ||
+			is(Req == RequestAddImageFromPixels))
+		{
+			DbType db = *enforceEx!DatabaseNotFoundException(req.db_id in databases, "Database isn't loaded");
 
-			DbType* db = req.db_id in databases;
-			if(db is null) {
-				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbNotFound));
+			BaseDb bdb = db.visit!(
+				(FileDb fdb) { return cast(BaseDb)fdb; },
+				(MemDb mdb)  { return cast(BaseDb)mdb; }
+			)();
+
+			user_id_t image_id;
+			if(req.generate_id) {
+				image_id = bdb.nextId();
+			} else {
+				image_id = req.image_id;
+			}
+
+			try {
+				bdb.addImage(image_data, image_id);
+			}
+			catch(BaseDb.AlreadyHaveIdException) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.AlreadyHaveId));
 				return;
 			}
 
-			void addImage(BaseDb bdb) {
-				ImageSigDcRes image_data;
-				try {
-				 image_data = ImageSigDcRes.fromFile(req.image_path);
-				}
+			conn.writePayload(ResponseImageAdded(req.db_id, image_id));
+		}
 
-				// Todo: Clean up exception catching code. There has to be a better way of
-				// mapping exceptions to a response code, and returning from the function
-				// early.
-				catch(sig.CantOpenFileException e) {
-					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantOpenFile));
-					return;
-				}
-				catch(sig.InvalidImageException e) {
-					conn.writePayload(ResponseFailure(ResponseFailure.Code.InvalidImage));
-					return;
-				}
-				catch(sig.CantResizeImageException e) {
-					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantResizeImage));
-					return;
-				}
-				catch(sig.CantExportPixelsException e) {
-					conn.writePayload(ResponseFailure(ResponseFailure.Code.CantExportPixels));
-					return;
-				}
+		void handleAddImageFromPath(RequestAddImageFromPath req) {
+			logTrace("Got add image from path request: %s: %s (gen id? %s, id: %d)", req.db_id, req.image_path, req.generate_id, req.image_id);
 
-				user_id_t image_id;
-				if(req.generate_id) {
-					image_id = bdb.nextId();
-				} else {
-					image_id = req.image_id;
-				}
+			ImageSigDcRes image_data = ImageSigDcRes.fromFile(req.image_path);
+			addImageData(image_data, req);
+		}
 
-				try {
-					bdb.addImage(image_data, image_id);
-				}
-				catch(BaseDb.AlreadyHaveIdException) {
-					conn.writePayload(ResponseFailure(ResponseFailure.Code.AlreadyHaveId));
-					return;
-				}
+		void handleAddImageFromPixels(RequestAddImageFromPixels req) {
+			scope(exit) { GC.free(req.pixels.ptr); }
 
-				conn.writePayload(ResponseImageAdded(req.db_id, image_id));
-			}
+			auto wand = MagickWand.getWand();
+			scope(exit) { MagickWand.disposeWand(wand); }
+			wand.importImagePixelsFlatEx(req.width, req.height, req.pixels);
 
-			(*db).visit!(
-				(FileDb fdb) { addImage(fdb); },
-				(MemDb mdb) { addImage(mdb); }
-			)();
+			ImageSigDcRes image_data = ImageSigDcRes.fromWand(wand);
+			addImageData(image_data, req);
 		}
 
 		while(conn.connected) {
@@ -194,29 +196,63 @@ int main(string[] args)
 					handleRequestPing,
 					handleRequestVersion,
 					handleRequestListDatabases,
-					handleoOpeningFileDatabase!RequestLoadFileDb,
-					handleoOpeningFileDatabase!RequestCreateFileDb,
+					handleOpeningFileDatabase!RequestLoadFileDb,
+					handleOpeningFileDatabase!RequestCreateFileDb,
 					handleAddImageFromPath);
 			}
+			catch(DatabaseNotFoundException) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbNotFound));
+			}
+
+			catch(magick_wand.wand.NonExistantFileException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.NonExistantFile));
+			}
+
+			catch(magick_wand.wand.InvalidImageException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.InvalidImage));
+			}
+
+			catch(magick_wand.wand.CantResizeImageException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.CantResizeImage));
+			}
+
+			catch(magick_wand.wand.CantExportPixelsException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.CantExportPixels));
+			}
+
+			catch(OnDiskPersistence.DbFileAlreadyExistsException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileAlreadyExists));
+			}
+
+			catch(OnDiskPersistence.DbFileNotFoundException e) {
+				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileNotFound));
+			}
+
 			catch(Exception e) {
+				logError("Caught exception: %s (msg: %s)", e, e.msg);
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.UnknownException));
 			}
 		}
 	}
 
-	listenTCP(port, (conn) { handleConnection(conn); }, address);
-
-	logDiagnostic("Running event loop...");
 	int status;
 
-	try {
+	try
+	{
+		listenTCP(port, (conn) { handleConnection(conn); }, address);
+
+		logDiagnostic("Running event loop...");
+
 		status = runEventLoop();
-	} catch( Throwable th ){
-		logError("Unhandled exception in event loop: %s", th.toString());
-		return 1;
+		logDiagnostic("Event loop exited with status %d.", status);
+
+	}
+	catch(core.exception.InvalidMemoryOperationError e)
+	{
+		writeln(e);
+		return -1;
 	}
 
-	logDiagnostic("Event loop exited with status %d.", status);
 	return status;
 }
 
