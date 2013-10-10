@@ -17,7 +17,7 @@ import std.getopt : getopt;
 import std.variant : tryVisit;
 import std.array : split;
 import std.format : formattedRead, format;
-import std.string : chomp;
+import std.string : chomp, strip;
 import std.datetime : dur;
 
 int main(string[] args)
@@ -94,16 +94,6 @@ int main(string[] args)
 		req.image_path = image_path;
 
 		conn.writePayload(req);
-		Payload resp = conn.readPayload();
-
-		resp.tryVisit!(
-			(ResponseImageAdded r) {
-				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
-			},
-			(ResponseFailure r) {
-				writefln("Failure | %s", r.code);
-			}
-		)();
 	}
 
 	void addImageRemote(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
@@ -114,9 +104,10 @@ int main(string[] args)
 			auto wand = MagickWand.fromFile(image_path);
 			scope(exit) { MagickWand.disposeWand(wand); }
 
-			req.width =  cast(uint) wand.imageWidth();
-			req.height = cast(uint) wand.imageHeight();
+			req.original_width  = cast(ushort) wand.imageWidth();
+			req.original_height = cast(ushort) wand.imageHeight();
 
+			// The actual pixels sent over have been resized
 			ImageSig.resizeWand(wand);
 			req.pixels = wand.exportImagePixelsFlatEx!RGB();
 		}
@@ -129,16 +120,6 @@ int main(string[] args)
 		scope(exit) { GC.free(req.pixels.ptr); }
 
 		conn.writePayload(req);
-		Payload resp = conn.readPayload();
-
-		resp.tryVisit!(
-			(ResponseImageAdded r) {
-				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
-			},
-			(ResponseFailure r) {
-				writefln("Failure | %s", r.code);
-			}
-		)();
 	}
 
 	void genericLoadCreateFileDb(Req)(string db_path)
@@ -163,11 +144,16 @@ int main(string[] args)
 		write("Select action (help): ");
 		auto cmd_string = readln();
 		if(cmd_string) {
-			cmd_string = cmd_string.chomp();
+			cmd_string = cmd_string.chomp().strip();
 		} else {
 			cmd_string = "";
 		}
-		auto cmd_parts = cmd_string.split(" ");
+
+
+		auto cmd_parts = cmd_string.split();
+
+		writeln("CMD string: ", cmd_string);
+		writeln("CMD parts: ", cmd_parts);
 
 		string command;
 		if(cmd_parts.length == 0)
@@ -215,7 +201,7 @@ int main(string[] args)
 			image_path = cmd_parts[1];
 			formattedRead(cmd_parts[2], "%d", &db_id);
 
-			bool gen_image_id = (cmd_parts.length == 4);
+			bool gen_image_id =  (cmd_parts.length == 3);
 			user_id_t image_id;
 
 			if(!gen_image_id) {
@@ -227,6 +213,17 @@ int main(string[] args)
 			} else {
 				addImageRemote(image_path, db_id, image_id, gen_image_id);
 			}
+
+			Payload resp = conn.readPayload();
+			resp.tryVisit!(
+				(ResponseImageAdded r) {
+					writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
+				},
+				(ResponseFailure r) {
+					writefln("Failure | %s", r.code);
+				}
+			)();
+
 		}
 
 		else {

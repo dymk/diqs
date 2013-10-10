@@ -6,6 +6,8 @@ import vibe.core.file :
   FileMode,
   FileStream;
 
+import std.stdio : File;
+
 // Helper functions for reading and writing
 // values of various sizes to a file
 Stream writeUlong(Stream)(Stream file, ulong val) {
@@ -61,7 +63,7 @@ version(unittest) {
 	import types : user_id_t;
 
 	import std.file : remove;
-	import std.stdio : writeln, File;
+	import std.stdio : writeln;
 
 	static string test_file_path = "test/test_readwrite.tmp";
 

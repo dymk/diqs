@@ -66,7 +66,7 @@ int main(string[] args)
 
 			bool found = db.visit!(
 				(FileDb fdb) {
-					return fdb.path() == Path(path);
+					return Path(fdb.path()) == Path(path);
 				},
 				(MemDb mdb) {
 					return false;
@@ -85,12 +85,12 @@ int main(string[] args)
 		logInfo("Made a connection with %s", conn.peerAddress);
 
 		void handleRequestPing(RequestPing req) {
-			logTrace("Client requested Ping");
+			logDebug("Client requested Ping");
 			conn.writePayload(ResponsePong());
 		}
 
 		void handleRequestVersion(RequestVersion r) {
-			logTrace("Client requested Version");
+			logDebug("Client requested Version");
 			conn.writePayload!ResponseVersion(ResponseVersion(VersionMajor, VersionMinor, VersionPatch));
 		}
 
@@ -171,20 +171,38 @@ int main(string[] args)
 		}
 
 		void handleAddImageFromPath(RequestAddImageFromPath req) {
-			logTrace("Got add image from path request: %s: %s (gen id? %s, id: %d)", req.db_id, req.image_path, req.generate_id, req.image_id);
+			logDebug("Got add image from path request: %s (dbid: %d, gen id? %s, id: %d)",
+				req.image_path, req.db_id, req.generate_id, req.image_id);
 
-			ImageSigDcRes image_data = ImageSigDcRes.fromFile(req.image_path);
+			// This is an ugly workaround to handle ImageMagick not liking
+			// fibers. Perhaps yield this fiber after spawning the thread and
+			// sending the path, and then having the spawned thread signal
+			// for the fiber to resume? More research required.
+			auto imageDataThreadId = spawn(&genImageDataFunc, thisTid);
+			send(imageDataThreadId, req.image_path);
+			ImageSigDcRes image_data = receiveOnly!ImageSigDcRes();
+
+			logDebug("Processed image data (res %dx%d)",
+				image_data.res.width, image_data.res.height);
+
 			addImageData(image_data, req);
 		}
 
 		void handleAddImageFromPixels(RequestAddImageFromPixels req) {
+			logDebug("Got add image from pixels request: %s (gen id? %s, id: %d)",
+				req.db_id, req.generate_id, req.image_id);
+
 			scope(exit) { GC.free(req.pixels.ptr); }
 
 			auto wand = MagickWand.getWand();
 			scope(exit) { MagickWand.disposeWand(wand); }
-			wand.importImagePixelsFlatEx(req.width, req.height, req.pixels);
+
+			// Pixels recieved should already be compact size
+			wand.importImagePixelsFlatEx(ImageWidth, ImageHeight, req.pixels);
 
 			ImageSigDcRes image_data = ImageSigDcRes.fromWand(wand);
+			image_data.res = ImageRes(req.original_width, req.original_height);
+
 			addImageData(image_data, req);
 		}
 
@@ -274,4 +292,13 @@ void printHelp() {
       Default value: 127.0.0.1
 `
 	);
+}
+
+// A workaround for MagickWand. Processes MagickWand work in a separate
+// thread, because MagickWand doesn't like fibers.
+import std.concurrency;
+void genImageDataFunc(Tid tid) {
+	receive((string image_path) {
+		send(tid, ImageSigDcRes.fromFile(image_path));
+	});
 }

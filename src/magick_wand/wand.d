@@ -25,6 +25,13 @@ final class NonExistantFileException : WandException {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 }
 
+shared static this() {
+	MagickWandGenesis();
+}
+shared static ~this() {
+	MagickWandTerminus();
+}
+
 // "magick-wand-private.h", line 33
 class MagickWand {
 
@@ -41,16 +48,16 @@ class MagickWand {
 		DestroyMagickWand(wandPtr);
 	}
 
-	auto readImageEx(string fname)
+	bool readImageEx(string fname)
 	{
 		import std.file : exists;
 		if(!exists(fname))
 			throw new NonExistantFileException("File " ~ fname ~ " does not exist");
 		return enforceEx!InvalidImageException(readImage(fname), "Couldn't open image file: " ~ fname);
 	}
-	auto readImage(string fname)
+	bool readImage(string fname)
 	{
-		return this.wandPtr.MagickReadImage(fname.toStringz());
+		return MagickReadImage(this.wandPtr, fname.toStringz());
 	}
 
 	auto imageWidth()   { return this.wandPtr.MagickGetImageWidth(); }

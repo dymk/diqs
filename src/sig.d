@@ -219,3 +219,9 @@ version(unittest) {
 		return img;
 	}
 }
+
+unittest {
+	ImageSigDcRes data = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	assert(data.res == ImageRes(650, 433));
+	assert(data != ImageSigDcRes.init);
+}

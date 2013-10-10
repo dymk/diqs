@@ -34,8 +34,8 @@ struct RequestAddImageFromPixels {
 	bool generate_id = false;
 	user_id_t image_id;
 
-	uint width;
-	uint height;
+	ushort original_width;
+	ushort original_height;
 	RGB[] pixels;
 }
 

@@ -126,10 +126,8 @@ final class FileDb : PersistedDb
 
 			if(enforce_clean) {
 				enforceClean();
-				writeln("DB is clean");
 			} else {
 				enforceOpened();
-				writeln("DB is open");
 			}
 
 			m_handle.close();
@@ -210,7 +208,6 @@ final class FileDb : PersistedDb
 		m_add_jobs.clear();
 
 		// Write the header information (number of images + bucket size metadata)
-		writeln("Writing header data: ", numImages());
 		m_handle.seek(OffsetNumImages);
 		m_handle.writeUint(numImages());
 
@@ -260,9 +257,7 @@ private:
 	}
 
 	~this() {
-		writeln("Dtor");
 		if(opened()) {
-			writeln("Was open, closing");
 			close();
 		}
 	}
@@ -316,16 +311,9 @@ private:
 
 		enforce(m_handle.tell() == OffsetImageData);
 
-		if(m_num_images) {
-			writeln("Loading images: ", m_num_images);
-		} else {
-			writeln("No image to load; this is a new DB");
-		}
-
 		uint index = 0;
 		scope itr = imageDataIterator();
 		foreach(ref ImageIdSigDcRes image_data; itr) {
-			writeln("Loaded image number: ", index);
 			m_mem_db.addImage(image_data);
 			m_id_index_map[image_data.user_id] = index;
 			index++;
