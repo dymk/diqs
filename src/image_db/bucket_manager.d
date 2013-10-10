@@ -22,13 +22,14 @@ import std.conv : to;
 
 // A wrapper struct for easy passing and manipulation of bucket sizes.
 struct BucketSizes {
-	int[NumBuckets] sizes;
+	uint[NumBuckets] sizes;
 
-	int[] Y() { return forChan(0); }
-	int[] I() { return forChan(1); }
-	int[] Q() { return forChan(2); }
+	uint[] Y() { return forChan(0); }
+	uint[] I() { return forChan(1); }
+	uint[] Q() { return forChan(2); }
 
-	int[] forChan(ubyte chan) {
+	uint[] forChan(ubyte chan) {
+		enforce(chan < NumColorChans);
 		return sizes[(chan * NumBucketsPerChan) .. ((chan+1) * NumBucketsPerChan)];
 	}
 }

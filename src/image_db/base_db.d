@@ -62,11 +62,14 @@ interface BaseDb
 	 */
 	uint numImages();
 
-	user_id_t nextId();
+	/**
+	 * Returns the next available user ID
+	 */
+	user_id_t peekNextId();
 }
 
 // Guarenteed to never return the same number twice.
-class IdGen(T)
+final class IdGen(T)
 {
 	void saw(T id) {
 		last_id = max(last_id, id+1);
@@ -76,32 +79,36 @@ class IdGen(T)
 		return last_id++;
 	}
 
+	T peek() {
+		return last_id;
+	}
+
 private:
 	T last_id;
 }
 
 unittest {
-	auto id = new IdGen!uint();
+	scope id = new IdGen!uint();
 	assert(id.next() == 0);
 	assert(id.next() == 1);
 }
 
 unittest {
-	auto id = new IdGen!uint();
+	scope id = new IdGen!uint();
 	assert(id.next() == 0);
 	id.saw(7);
 	assert(id.next() == 8);
 }
 
 unittest {
-	auto id = new IdGen!uint();
+	scope id = new IdGen!uint();
 	assert(id.next() == 0);
 	id.saw(0);
 	assert(id.next() == 1);
 }
 
 unittest {
-	auto id = new IdGen!uint();
+	scope id = new IdGen!uint();
 	id.next();
 	id.next();
 	id.next();
@@ -111,8 +118,20 @@ unittest {
 }
 
 unittest {
-	auto id = new IdGen!uint();
+	scope id = new IdGen!uint();
 	id.saw(10);
 	assert(id.next() == 11);
 	assert(id.next() == 12);
+}
+
+unittest {
+	scope id = new IdGen!uint();
+	assert(id.peek() == 0);
+	assert(id.peek() == 0);
+	assert(id.peek() == 0);
+	assert(id.next() == 0);
+	assert(id.peek() == 1);
+	assert(id.next() == 1);
+	id.saw(12);
+	assert(id.peek() == 13);
 }

@@ -1,7 +1,8 @@
 module net.response;
 
 import types;
-import image_db.all : MemDb, FileDb;
+import image_db.mem_db : MemDb;
+import image_db.file_db : FileDb;
 import net.db_info : DbInfo;
 
 struct ResponseDbInfo {

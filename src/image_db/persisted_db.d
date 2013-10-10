@@ -1,83 +1,40 @@
 module image_db.persisted_db;
 
-abstract class PersistedDb
+import image_db.base_db : BaseDb;
+import image_db.mem_db : MemDb;
+import sig;
+
+import std.container : Array;
+import std.range : isInputRange;
+
+interface PersistedDb : BaseDb
 {
-	// Performs the actual loading of the database into memory,
-	// and generation of whatever other bookkeeping information it needs
-	void load();
+	// Releases the underlying MemDb. Invalidates the database from.
+	MemDb releaseMemDb();
 
-	// Releases the underlying MemDb. Invalidates the database.
-	MemDb release();
+	// Returns true if the memdb has already been released.
+	bool released();
 
-	// Returns true if the database can be queried
-	bool canQuery();
+	// Flushes the data waiting to be persisted on whatever the persistence
+	// media is.
+	bool flush();
 
-	// Returns true if the database can be flushed
-	// to the underlying persisted layer.
-	bool canFlush();
-
-	// Returns true if the flush queue isn't empty.
+	// Returns true if there is data waiting to be flushed to the persistence
+	// media.
 	bool dirty();
+	bool clean(); // !dirty()
 
-	// Writes the add queue to the persistence medium.
-	final bool flush() {
-		bool ret = m_add_jobs.length || m_remove_jobs.length;
-		flushQueue(m_add_jobs, m_remove_jobs);
-
-		m_add_jobs.clear();
-		m_remove_jobs.clear();
-
-		return ret;
-	}
-
-	final auto addImage(in ImageIdSigDcRes img) {
-		auto ret = borrowMemDb().addImage(img);
-		onImageAdded(img);
-		m_add_jobs.insertBack(img);
-		return ret;
-	}
-
-	final auto removeImage(user_id_t user_id) {
-		auto ret = borrowMemDb().removeImage(user_id);
-		onImageRemoved(user_id);
-		m_remove_jobs.insertBack(user_id);
-		return ret;
-	}
+	// Is the database closed?
+	bool closed();
+	bool opened(); // !closed()
 
 	// A forward range to iterate over all the
 	// images in the database.
 	interface ImageDataIterator {
 		ImageIdSigDcRes front();
-		void popFront();
 		bool empty();
+		void popFront();
 	}
+	static assert(isInputRange!ImageDataIterator);
 	ImageDataIterator imageDataIterator();
-
-	~this() {
-		m_add_jobs.clear();
-		m_remove_jobs.clear();
-		GC.free(mem_db);
-	}
-
-protected:
-	void flushQueue(AddImageJobs[], RemoveImageJobs[]);
-	MemDb borrowMemDb();
-
-	// Optional methods for subclasses to implement. Called on
-	// image adding or removal.
-	void onImageAdded(in ImageIdSigDcRes) {};
-	void onImageRemoved(user_id_t)        {};
-
-	this() {
-		mem_db = new MemDb();
-	}
-
-private:
-	alias ImageAddJob = ImageIdSigDcRes;
-	alias ImageRmJob  = user_id_t;
-
-	Array!ImageAddJob m_add_jobs;
-	Array!ImageRmJob  m_rm_jobs;
-
-	MemDb mem_db;
 }

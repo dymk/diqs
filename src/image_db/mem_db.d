@@ -24,7 +24,11 @@ import query :
 import std.algorithm : min, max;
 import std.exception : enforce;
 
-class MemDb : BaseDb
+version(unittest) {
+	import sig : sameAs;
+}
+
+final class MemDb : BaseDb
 {
 	alias StoredImage = ImageIdDcRes;
 
@@ -149,7 +153,7 @@ class MemDb : BaseDb
 	}
 
 	uint numImages() { return cast(uint) m_mem_imgs.length; }
-	user_id_t nextId() { return m_id_gen.next(); }
+	user_id_t peekNextId() { return m_id_gen.peek(); }
 
 	auto query(const QueryParams params)
 	{

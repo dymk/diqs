@@ -7,11 +7,9 @@ import net.payload;
 import net.common;
 
 import image_db.file_db : FileDb;
-import image_db.base_db : IdGen;
+import image_db.base_db : BaseDb, IdGen;
 
 import magick_wand.wand;
-
-import persistence_layer.on_disk_persistence;
 
 import std.getopt : getopt;
 import std.stdio : writeln, writefln, stderr;
@@ -19,6 +17,7 @@ import std.variant : Algebraic, tryVisit, visit;
 
 import vibe.core.net : listenTCP;
 import vibe.core.core : runEventLoop, lowerPrivileges;
+import vibe.inet.path : Path;
 import vibe.core.log;
 
 enum VersionMajor = 0;
@@ -67,7 +66,7 @@ int main(string[] args)
 
 			bool found = db.visit!(
 				(FileDb fdb) {
-					return fdb.path() == path;
+					return fdb.path() == Path(path);
 				},
 				(MemDb mdb) {
 					return false;
@@ -92,7 +91,7 @@ int main(string[] args)
 
 		void handleRequestVersion(RequestVersion r) {
 			logTrace("Client requested Version");
-			conn.writePayload(ResponseVersion(VersionMajor, VersionMinor, VersionPatch));
+			conn.writePayload!ResponseVersion(ResponseVersion(VersionMajor, VersionMinor, VersionPatch));
 		}
 
 		void handleRequestListDatabases(RequestListDatabases req) {
@@ -128,9 +127,10 @@ int main(string[] args)
 			else static if(is(R == RequestLoadFileDb))
 			{
 				FileDb db = FileDb.loadFromFile(req.db_path, req.create_if_not_exist);
+				logDiagnostic("Loaded database at path %s", req.db_path);
 			}
 			else
-				static assert(false);
+				static assert(false, "Request type must be LoadFileDb or CreateFileDb");
 
 
 			auto db_id = id_gen.next();
@@ -154,7 +154,7 @@ int main(string[] args)
 
 			user_id_t image_id;
 			if(req.generate_id) {
-				image_id = bdb.nextId();
+				image_id = bdb.peekNextId();
 			} else {
 				image_id = req.image_id;
 			}
@@ -220,11 +220,11 @@ int main(string[] args)
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.CantExportPixels));
 			}
 
-			catch(OnDiskPersistence.DbFileAlreadyExistsException e) {
+			catch(FileDb.DbFileAlreadyExistsException e) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileAlreadyExists));
 			}
 
-			catch(OnDiskPersistence.DbFileNotFoundException e) {
+			catch(FileDb.DbFileNotFoundException e) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileNotFound));
 			}
 
