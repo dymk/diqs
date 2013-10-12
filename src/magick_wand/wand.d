@@ -24,13 +24,16 @@ final class CantImportPixelsException : WandException {
 final class NonExistantFileException : WandException {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 }
+final class CantCreateNewImageException : WandException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+}
 
-shared static this() {
-	MagickWandGenesis();
-}
-shared static ~this() {
-	MagickWandTerminus();
-}
+//shared static this() {
+//	MagickWandGenesis();
+//}
+//shared static ~this() {
+//	MagickWandTerminus();
+//}
 
 // "magick-wand-private.h", line 33
 class MagickWand {
@@ -76,6 +79,53 @@ class MagickWand {
 	auto resizeImage(size_t cols, size_t rows, FilterTypes filter, double blur)
 	{
 		return this.wandPtr.MagickResizeImage(cols, rows, filter, blur);
+	}
+
+	auto newImageEx(size_t cols, size_t rows, PixelWand px_wand = null)
+	{
+		return enforceEx!CantCreateNewImageException(newImage(cols, rows, px_wand));
+	}
+
+	auto newImage(size_t cols, size_t rows, PixelWand px_wand = null)
+	{
+		bool shouldDestroy = px_wand is null;
+
+		if(shouldDestroy) {
+			px_wand = new PixelWand();
+		}
+
+		scope(exit) {
+			if(shouldDestroy) {
+				px_wand.destroy();
+				GC.free(cast(void*)px_wand);
+			}
+		}
+
+		return this.wandPtr.MagickNewImage(cols, rows, px_wand.ptr());
+	}
+
+	auto getNumberImages()
+	{
+		return this.wandPtr.MagickGetNumberImages();
+	}
+
+	auto getException(ExceptionType* ex_type = null) {
+		ExceptionType tmp;
+
+		if(ex_type is null) {
+			ex_type = &tmp;
+		}
+
+		char* err_str = this.wandPtr.MagickGetException(ex_type);
+		scope(exit) {
+			import core.stdc.stdlib;
+			free(cast(void*)err_str);
+		}
+
+		import std.conv : to;
+		string ret = to!string(err_str);
+
+		return ret;
 	}
 
 	auto exportImagePixelsEx(T)(
@@ -197,19 +247,18 @@ class MagickWand {
 		}
 		else
 		{
-			scope pxbuffer = new RGB[pixels.length];
+			auto pxbuffer = new RGB[pixels.length];
+			scope(exit) { GC.free(pxbuffer.ptr); }
+
 			foreach(i; 0..pixels.length)
 			{
 				pxbuffer[i] = pixels[i].toRGB();
 			}
 		}
 
-		bool ret = this.wandPtr.MagickImportImagePixels(
+		return this.wandPtr.MagickImportImagePixels(
 			x, y, cols, rows, "RGB".toStringz(),
 			StorageType.CharPixel, pxbuffer.ptr);
-
-		// ret == false means success
-		return ret == MagickFalse;
 	}
 
 	// Flyweight pattern to avoid needless allocations
@@ -258,6 +307,13 @@ unittest {
 	assert(wand.readImage("test/nonexistant.jpg") == false);
 }
 
+unittest {
+	scope wand = new MagickWand;
+	assert(wand.getNumberImages() == 0);
+	wand.readImageEx("test/small_bmp.bmp");
+	assert(wand.getNumberImages() == 1);
+}
+
 // imageWidth
 unittest {
 	scope wand = new MagickWand;
@@ -295,8 +351,25 @@ unittest {
 	}
 }
 
-// importImagePixelsFlat
+// newImage
 unittest {
 	scope wand = new MagickWand;
-	assert(wand.importImagePixelsFlat(1, 3, [RGB(0, 0, 0), RGB(0, 0, 0), RGB(0, 0, 0)]));
+	assert(wand.newImage(10, 5));
+	assert(wand.imageWidth() == 10);
+	assert(wand.imageHeight() == 5);
+}
+
+// importImagePixelsFlat
+unittest {
+	auto pixels = [RGB(0, 4, 23), RGB(0, 0, 0), RGB(0, 0, 0)];
+
+	scope wand = new MagickWand;
+	assert(wand.newImage(1, 3));
+
+	assert(wand.importImagePixelsFlat(1, 3, pixels));
+
+	assert(wand.imageWidth() == 1);
+	assert(wand.imageHeight() == 3);
+
+	assert(wand.exportImagePixelsFlat!RGB() == pixels);
 }

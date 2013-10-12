@@ -9,6 +9,7 @@ import sig :
   ImageIdSigDcRes,
   ImageSigDcRes;
 import consts : ImageArea, NumColorChans;
+import query : QueryResult, QueryParams;
 
 import std.conv : to;
 import std.algorithm : max;
@@ -66,6 +67,11 @@ interface BaseDb
 	 * Returns the next available user ID
 	 */
 	user_id_t peekNextId();
+
+	/**
+	 * Performs a query on the database
+	 */
+	QueryResult[] query(QueryParams);
 }
 
 // Guarenteed to never return the same number twice.

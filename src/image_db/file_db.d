@@ -10,7 +10,7 @@ import std.container : Array;
 import core.memory : GC;
 import core.sync.mutex : Mutex;
 
-import std.stdio : File;
+import std.stdio : File, writeln;
 //import vibe.core.file :
 //  existsFile,
 //  openFile,
@@ -42,35 +42,36 @@ import consts :
   NumBuckets;
 
 import query :
+  QueryResult,
   QueryParams;
 
 final class FileDb : PersistedDb
 {
-		static class FileDbException : Exception {
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		static final class InvalidFileException : FileDbException {
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		static final class DbFileNotFoundException : FileDbException {
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		static final class DbFileAlreadyExistsException : FileDbException {
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		static final class DbDirtyException : FileDbException {
-			this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is dirty", file, line, next); }
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		// Thrown if the underlying MemDb has already been released
-		static final class AlreadyReleasedException : FileDbException {
-			this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database already loaded", file, line, next); }
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
-		static final class DbClosedException : FileDbException {
-			this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is closed", file, line, next); }
-			this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		};
+	static class FileDbException : Exception {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class InvalidFileException : FileDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class DbFileNotFoundException : FileDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class DbFileAlreadyExistsException : FileDbException {
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class DbDirtyException : FileDbException {
+		this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is dirty", file, line, next); }
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	// Thrown if the underlying MemDb has already been released
+	static final class AlreadyReleasedException : FileDbException {
+		this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database already loaded", file, line, next); }
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
+	static final class DbClosedException : FileDbException {
+		this(string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Database is closed", file, line, next); }
+		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+	};
 
 	enum ulong Magic       = 0xDEADBEEF;
 	enum OffsetMagic       = 0;
@@ -78,6 +79,10 @@ final class FileDb : PersistedDb
 	enum OffsetBucketSizes = OffsetNumImages + uint.sizeof;
 	enum OffsetImageData   = OffsetBucketSizes + (uint.sizeof * NumBuckets);
 
+	/**
+	 * Creates a database at path 'path'. If the Db already exists,
+	 * a DbFileAlreadyExistsException is thrown.
+	 */
 	static FileDb createFromFile(string path)
 	{
 		if(existsFile(path)) {
@@ -86,11 +91,20 @@ final class FileDb : PersistedDb
 		return loadFromFile(path, true);
 	}
 
+	/**
+	 * Loads the db file at 'path'. Throws if it doesn't exist, unless
+	 * create_if_nonexistant is true, in which case a blank database is created.
+	 */
 	static FileDb loadFromFile(string path, bool create_if_nonexistant = false)
 	{
 		return new FileDb(path, create_if_nonexistant);
 	}
 
+	/**
+	 * Adds an image to the database, and returns the image's user ID.
+	 * By default, the database is flushed to the disk after the operation
+	 * completes.
+	 */
 	user_id_t addImage(in ImageIdSigDcRes img, bool flush_now) {
 		enforceOpened();
 		auto ret = enforceMemDb().addImage(img);
@@ -100,11 +114,15 @@ final class FileDb : PersistedDb
 			flush();
 		return ret;
 	}
-
 	user_id_t addImage(in ImageIdSigDcRes img) {
 		return addImage(img, true);
 	}
 
+	/**
+	 * Removes an image from the database, and returns that image.
+	 * By default, the database is flushed to the disk after the operation
+	 * completes.
+	 */
 	ImageIdSigDcRes removeImage(user_id_t user_id, bool flush_now) {
 		enforceOpened();
 		auto ret = enforceMemDb().removeImage(user_id);
@@ -114,7 +132,6 @@ final class FileDb : PersistedDb
 			flush();
 		return ret;
 	}
-
 	ImageIdSigDcRes removeImage(user_id_t user_id) {
 		return removeImage(user_id, true);
 	}
@@ -122,6 +139,7 @@ final class FileDb : PersistedDb
 	// By default, force the DB to be clean before closing it
 	void close() { close(true); }
 	void close(bool enforce_clean) {
+
 		synchronized(m_handle_mutex) {
 
 			if(enforce_clean) {
@@ -157,22 +175,57 @@ final class FileDb : PersistedDb
 		return enforceMemDb().peekNextId();
 	}
 
-	auto query(QueryParams query) {
-		enforceClean();
-		return enforceMemDb().query(query);
+	/**
+	 * Perform a query on the database.
+	 * if allow_dirty is true, then the query is performed
+	 * on the underlying db, and a check that the file DB has
+	 * been flushed ot the disk is skipped.
+	 *
+	 * By default, the database must be clean in order to perform
+	 * a query.
+	 */
+	QueryResult[] query(QueryParams params, bool allow_dirty)
+	{
+		if(!allow_dirty)
+			enforceClean();
+		return enforceMemDb().query(params);
+	}
+	QueryResult[] query(QueryParams params) {
+		return query(params, false);
 	}
 
+	/*
+	 * Returns an InputRange which iterates over
+	 * all the images on the disk. Requires the database
+	 * to be open and clean.
+	 */
 	FileImageDataIterator imageDataIterator() {
 		return new FileImageDataIterator;
 	}
 
+	/**
+	 * Returns the file path to the database.
+	 */
 	string path() {
-		enforceOpened();
 		return m_path;
 	}
 
+	/**
+	 * Returns the number of images in the underlying memdb.
+	 * By default, the database must be clean. This can be
+	 * overridden by calling numImages(true), which skips
+	 * the database clean check.
+	 *
+	 * Note that if the clean check is skipped, the number of
+	 * images returned will reflect the number at the last flush,
+	 * not the number waiting to be written/removed from the disk.
+	 */
 	uint numImages() {
-		enforceClean();
+		return numImages(false);
+	}
+	uint numImages(bool allow_dirty) {
+		if(!allow_dirty)
+			enforceClean();
 		return enforceMemDb().numImages();
 	}
 
@@ -189,7 +242,11 @@ final class FileDb : PersistedDb
 
 	bool flush() {
 		// Flushes the queued jobs add/remove image jobs to the disk
-		//enforce(m_handle.writable());
+		enforceOpened();
+
+		// we need an exclusive lock on the file to do work
+		m_handle_mutex.lock();
+		scope(exit) { m_handle_mutex.unlock(); }
 
 		foreach(rm_id; m_rm_jobs) {
 			if(m_add_jobs.length) {
@@ -224,10 +281,15 @@ private:
 	final class FileImageDataIterator : ImageDataIterator {
 
 		this() {
+			enforceOpened();
 			enforceClean();
 		}
 
-		ImageIdSigDcRes front() {
+		ImageIdSigDcRes front()
+		in {
+			assert(!empty());
+		}
+		body {
 			return readImageDataAtIndex(m_pos);
 		}
 
@@ -257,7 +319,9 @@ private:
 	}
 
 	~this() {
+		writeln("Destroying filedb");
 		if(opened()) {
+			writeln("was open, closing filedb");
 			close();
 		}
 	}
@@ -322,12 +386,10 @@ private:
 
 	void enforceClean() {
 		enforceEx!DbDirtyException(clean());
-		enforceOpened();
 	}
 
 	void enforceOpened() {
 		enforceEx!DbClosedException(opened());
-		enforceMemDb();
 	}
 
 	MemDb enforceMemDb() {
@@ -439,27 +501,27 @@ private:
 	/**
 	 * Bucket size specific functions
 	 */
-	 void addToBucketSizes(ImageSig sig) {
-	 	opFromBucketSizes!("++")(sig);
-	 }
+	void addToBucketSizes(ImageSig sig) {
+		opFromBucketSizes!("++")(sig);
+	}
 
-	 void subFromBucketSizes(ImageSig sig) {
-	 	opFromBucketSizes!("--")(sig);
-	 }
+	void subFromBucketSizes(ImageSig sig) {
+		opFromBucketSizes!("--")(sig);
+	}
 
-	 void opFromBucketSizes(alias string op)(ImageSig image_sig)
-	 if(op == "++" || op == "--")
-	 {
-	 	foreach(ubyte chan, ref sig_t sig; image_sig.sigs) {
+	void opFromBucketSizes(alias string op)(ImageSig image_sig)
+	if(op == "++" || op == "--")
+	{
+		foreach(ubyte chan, ref sig_t sig; image_sig.sigs) {
 
-	 		auto chan_sizes = m_bucket_sizes.forChan(chan);
-	 		foreach(coeffi_t coeff; sig)
-	 		{
-	 			ushort index = BucketManager.bucketIndexForCoeff(coeff);
-	 			mixin("chan_sizes[index]" ~ op ~ ";");
-	 		}
-	 	}
-	 }
+			auto chan_sizes = m_bucket_sizes.forChan(chan);
+			foreach(coeffi_t coeff; sig)
+			{
+				ushort index = BucketManager.bucketIndexForCoeff(coeff);
+				mixin("chan_sizes[index]" ~ op ~ ";");
+			}
+		}
+	}
 }
 
 /**

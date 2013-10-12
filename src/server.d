@@ -2,6 +2,7 @@ module server;
 
 import types;
 import sig;
+import query;
 
 import net.payload;
 import net.common;
@@ -14,6 +15,7 @@ import magick_wand.wand;
 import std.getopt : getopt;
 import std.stdio : writeln, writefln, stderr;
 import std.variant : Algebraic, tryVisit, visit;
+import std.range : array;
 
 import vibe.core.net : listenTCP;
 import vibe.core.core : runEventLoop, lowerPrivileges;
@@ -78,6 +80,16 @@ int main(string[] args)
 		}
 
 		return false;
+	}
+
+	BaseDb enforceHasDb(user_id_t db_id)
+	{
+		DbType db = *enforceEx!DatabaseNotFoundException(db_id in databases, "Database isn't loaded");
+
+		return db.visit!(
+			(FileDb fdb) { return cast(BaseDb)fdb; },
+			(MemDb mdb)  { return cast(BaseDb)mdb; }
+		)();
 	}
 
 	void handleConnection(TCPConnection conn) {
@@ -145,18 +157,13 @@ int main(string[] args)
 			is(Req == RequestAddImageFromPath) ||
 			is(Req == RequestAddImageFromPixels))
 		{
-			DbType db = *enforceEx!DatabaseNotFoundException(req.db_id in databases, "Database isn't loaded");
-
-			BaseDb bdb = db.visit!(
-				(FileDb fdb) { return cast(BaseDb)fdb; },
-				(MemDb mdb)  { return cast(BaseDb)mdb; }
-			)();
+			BaseDb bdb = enforceHasDb(req.db_id);
 
 			user_id_t image_id;
-			if(req.generate_id) {
-				image_id = bdb.peekNextId();
-			} else {
+			if(req.use_image_id) {
 				image_id = req.image_id;
+			} else {
+				image_id = bdb.peekNextId();
 			}
 
 			try {
@@ -171,8 +178,8 @@ int main(string[] args)
 		}
 
 		void handleAddImageFromPath(RequestAddImageFromPath req) {
-			logDebug("Got add image from path request: %s (dbid: %d, gen id? %s, id: %d)",
-				req.image_path, req.db_id, req.generate_id, req.image_id);
+			logDebug("Got add image from path request: %s (dbid: %d, use id? %s, id: %d)",
+				req.image_path, req.db_id, req.use_image_id, req.image_id);
 
 			// This is an ugly workaround to handle ImageMagick not liking
 			// fibers. Perhaps yield this fiber after spawning the thread and
@@ -189,21 +196,68 @@ int main(string[] args)
 		}
 
 		void handleAddImageFromPixels(RequestAddImageFromPixels req) {
-			logDebug("Got add image from pixels request: %s (gen id? %s, id: %d)",
-				req.db_id, req.generate_id, req.image_id);
+			logDebug("Got add image from pixels request: %s (use id? %s, id: %d)",
+				req.db_id, req.use_image_id, req.image_id);
 
-			scope(exit) { GC.free(req.pixels.ptr); }
+			scope(exit) {
+				GC.free(req.pixels.ptr);
+			}
 
 			auto wand = MagickWand.getWand();
-			scope(exit) { MagickWand.disposeWand(wand); }
+			scope(exit) {
+				MagickWand.disposeWand(wand);
+			}
 
-			// Pixels recieved should already be compact size
-			wand.importImagePixelsFlatEx(ImageWidth, ImageHeight, req.pixels);
+			wand.newImageEx(
+				req.pixels_res.width,
+				req.pixels_res.height);
+
+			wand.importImagePixelsFlatEx(
+				req.pixels_res.width,
+				req.pixels_res.height,
+				req.pixels);
+
+			logDebug("Imported wand; image res: %dx%d",
+				wand.imageWidth(), wand.imageHeight());
 
 			ImageSigDcRes image_data = ImageSigDcRes.fromWand(wand);
-			image_data.res = ImageRes(req.original_width, req.original_height);
+			image_data.res = req.original_res;
 
 			addImageData(image_data, req);
+		}
+
+		void handleQueryFromPath(RequestQueryFromPath req)
+		{
+			BaseDb db = enforceHasDb(req.db_id);
+
+			QueryParams qp;
+
+			scope(exit) {
+				GC.free(cast(void*)req.image_path.ptr);
+			}
+
+			auto imageDataThreadId = spawn(&genImageDataFunc, thisTid);
+			send(imageDataThreadId, req.image_path);
+			ImageSigDcRes input = receiveOnly!ImageSigDcRes();
+
+			qp.in_image = &input;
+			qp.num_results = req.num_results;
+
+			scope(exit) {
+				GC.free(query_results.ptr);
+				GC.free(resp_results.ptr);
+			}
+			auto query_results = db.query(qp);
+			auto resp_results = query_results.map!(
+				(result) {
+					return ResponseQueryResults.QueryResult(
+						result.image.user_id,
+						result.similarity,
+						result.image.res);
+				}
+ 			)().array();
+
+			conn.writePayload(ResponseQueryResults(resp_results));
 		}
 
 		while(conn.connected) {
@@ -216,7 +270,9 @@ int main(string[] args)
 					handleRequestListDatabases,
 					handleOpeningFileDatabase!RequestLoadFileDb,
 					handleOpeningFileDatabase!RequestCreateFileDb,
-					handleAddImageFromPath);
+					handleAddImageFromPath,
+					handleAddImageFromPixels,
+					handleQueryFromPath);
 			}
 			catch(DatabaseNotFoundException) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbNotFound));

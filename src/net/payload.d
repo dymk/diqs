@@ -69,6 +69,7 @@ enum PayloadType : ushort {
 	response_pong,
 	response_version,
 	response_list_databases,
+	response_query_results,
 
 	request_create_file_db,
 	request_query_from_path,

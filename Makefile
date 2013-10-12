@@ -39,7 +39,6 @@ TEST_RUNNER_BIN = test_runner$(EXE_EXT)
 DIQS_DIR   := src
 DIQS_OBJ   := diqs$(OBJ_EXT)
 DIQS_FILES := \
-  $(shell ls src/magick_wand/*.d) \
   src/image_db/bucket.d \
   src/image_db/bucket_manager.d \
   src/image_db/mem_db.d \
@@ -53,6 +52,9 @@ DIQS_FILES := \
   src/sig.d \
   src/types.d \
   src/util.d
+
+MAGICKWAND_OBJ   := magickwand$(OBJ_EXT)
+MAGICKWAND_FILES := $(shell ls src/magick_wand/*.d)
 
 # A workaround for a DMD bug which prevents some file operations from being
 # unittestable.
@@ -105,6 +107,8 @@ else
 endif
 # ====================================================================
 
+COMMON_OBJS = $(MAGICKWAND_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ)
+
 # ====================================================================
 OPENSSL_DIR  := vendor/openssl
 LIBEVENT_DIR := vendor/libevent
@@ -144,45 +148,48 @@ speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
 speedtest: $(TEST_RUNNER_BIN)
 
 # ==============================================================================
-$(SERVER_BIN): $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ)
-	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ) $(LIBS) -of$(SERVER_BIN)
+$(SERVER_BIN):      $(SERVER_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(SERVER_BIN)
 
-$(SERVER_OBJ): $(SERVER_FILES)
+$(SERVER_OBJ):          $(SERVER_FILES)
 	$(DC) $(INCLUDE_DIRS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(CLIENT_BIN): $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ)
-	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ) $(LIBS) -of$(CLIENT_BIN)
+$(CLIENT_BIN):      $(CLIENT_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
 
-$(CLIENT_OBJ): $(CLIENT_FILES)
+$(CLIENT_OBJ):          $(CLIENT_FILES)
 	$(DC) $(INCLUDE_DIRS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ)
-	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ) $(LIBS) -of$(TEST_RUNNER_BIN)
+$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(TEST_RUNNER_BIN)
 
 $(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 
 
-$(PAYLOAD_OBJ): $(PAYLOAD_FILES)
-	$(DC) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
+$(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
+	$(DC) $(DC_FLAGS) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
 
-$(DIQS_OBJ): $(DIQS_FILES)
-	$(DC) $(DC_FLAGS) $(DIQS_FILES)    -c -of$(DIQS_OBJ)
+$(DIQS_OBJ):        $(DIQS_FILES)
+	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
 # A workaround due to bugs in unittesting certain files.
 $(NONUNITTESTED_OBJ): $(NONUNITTESTED_FILES)
-	$(DC) $(DC_FLAGS) $(NONUNITTESTED_FILES) -c -of$(NONUNITTESTED_OBJ)
+	$(DC) $(DC_FLAGS)   $(NONUNITTESTED_FILES) -c -of$(NONUNITTESTED_OBJ)
 
-$(VIBE_OBJ): $(VIBE_FILES)
-	$(DC) $(DC_FLAGS) $(VIBE_FILES)    -c -of$(VIBE_OBJ)
+$(VIBE_OBJ):        $(VIBE_FILES)
+	$(DC) $(DC_FLAGS) $(VIBE_FILES) -c -of$(VIBE_OBJ)
 
-$(MSGPACK_OBJ): $(MSGPACK_FILES)
+$(MSGPACK_OBJ):     $(MSGPACK_FILES)
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)
+
+$(MAGICKWAND_OBJ):  $(MAGICKWAND_FILES)
+	$(DC) $(DC_FLAGS) $(MAGICKWAND_FILES) -c -of$(MAGICKWAND_OBJ)
 
 .PHONY: clean
 clean:
