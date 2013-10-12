@@ -200,14 +200,15 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	version(unittest) {
-		bool sameAs(ImageIdSigDcRes other) const {
-			return (
-				other.user_id == this.user_id &&
-				other.dc == this.dc &&
-				other.res == this.res &&
-				other.sig.sameAs(this.sig));
-		}
+}
+
+version(unittest) {
+	bool sameAs(ImageIdSigDcRes a, ImageIdSigDcRes b) {
+		return (
+			a.user_id == b.user_id &&
+			     a.dc == b.dc &&
+			    a.res == b.res &&
+			a.sig.sameAs(b.sig));
 	}
 }
 
@@ -217,4 +218,10 @@ version(unittest) {
 		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
 		return img;
 	}
+}
+
+unittest {
+	ImageSigDcRes data = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	assert(data.res == ImageRes(650, 433));
+	assert(data != ImageSigDcRes.init);
 }

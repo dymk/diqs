@@ -1,7 +1,9 @@
 module net.response;
 
+import sig;
 import types;
-import image_db.all : MemDb, FileDb;
+import image_db.mem_db : MemDb;
+import image_db.file_db : FileDb;
 import net.db_info : DbInfo;
 
 struct ResponseDbInfo {
@@ -60,4 +62,14 @@ struct ResponseVersion {
 
 struct ResponseListDatabases {
 	DbInfo[] databases;
+}
+
+struct ResponseQueryResults {
+	struct QueryResult {
+		user_id_t user_id;
+		float similarity;
+		ImageRes res;
+	}
+
+	QueryResult[] results;
 }

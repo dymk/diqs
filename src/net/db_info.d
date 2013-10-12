@@ -1,7 +1,9 @@
 module net.db_info;
 
 import types;
-import image_db.all : BaseDb, FileDb, MemDb;
+import image_db.base_db;
+import image_db.file_db;
+import image_db.mem_db;
 
 struct DbInfo {
 	enum Type {

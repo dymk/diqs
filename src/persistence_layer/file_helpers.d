@@ -6,34 +6,54 @@ import vibe.core.file :
   FileMode,
   FileStream;
 
+import std.stdio : File;
+
 // Helper functions for reading and writing
 // values of various sizes to a file
-FileStream writeUlong(FileStream file, ulong val) {
+Stream writeUlong(Stream)(Stream file, ulong val) {
 	return writeValue!ulong(file, val);
 }
 
-FileStream writeUint(FileStream file, uint val) {
+Stream writeUint(Stream)(Stream file, uint val) {
 	return writeValue!uint(file, val);
 }
 
-uint readUint(FileStream file) {
+uint readUint(Stream)(Stream file) {
 	return readValue!uint(file);
 }
 
-ulong readUlong(FileStream file) {
+ulong readUlong(Stream)(Stream file) {
 	return readValue!ulong(file);
 }
 
+File writeValue(T)(File file, T val) {
+	return writeValue!(T, "rawWrite")(file, val);
+}
+
 FileStream writeValue(T)(FileStream file, T val) {
+	return writeValue!(T, "write")(file, val);
+}
+
+T readValue(T)(File file)
+{
+	return readValue!(T, "rawRead")(file);
+}
+
+T readValue(T)(FileStream file)
+{
+	return readValue!(T, "read")(file);
+}
+
+Stream writeValue(T, string write_method, Stream)(Stream file, T val) {
 	ubyte[T.sizeof] val_bytes = *(cast(ubyte[T.sizeof]*)(&val));
-	file.write(val_bytes);
+	mixin("file." ~ write_method ~ "(val_bytes);");
 	return file;
 }
 
-T readValue(T)(FileStream file) {
+T readValue(T, string read_method, Stream)(Stream file) {
 	T val;
 	ubyte[T.sizeof] val_bytes;
-	file.read(val_bytes);
+	mixin("file." ~ read_method ~ "(val_bytes);");
 	val = *(cast(T*)val_bytes.ptr);
 	return val;
 }
@@ -55,49 +75,49 @@ version(unittest) {
 }
 
 unittest {
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUint(10);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 
 	uint test = a.readUint();
 	assert(test == 10);
 }
 
 unittest {
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUlong(4598741);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 
 	ulong test = a.readUlong();
 	assert(test == 4598741);
 }
 
 unittest {
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
 	a.writeUlong(4598741);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 
 	ulong test = a.readUlong();
 	assert(test == 4598741);
 }
 
 unittest {
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 	scope(exit) { a.close(); }
 
@@ -105,7 +125,7 @@ unittest {
 	a.writeValue!float(foo);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 
 	float test = a.readValue!float();
 	assert(test == foo);
@@ -117,13 +137,13 @@ unittest {
 	}
 	Foo foo = { 42091.6190246420913190246420913190246 };
 
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 
 	a.writeValue(foo);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 	scope(exit) { a.close(); }
 	assert(a.readValue!Foo() == foo);
 }
@@ -149,13 +169,13 @@ unittest {
 	f.f = 765342.642091024264;
 	f.d = -8674209024783624703276453.240937024387624075224746320739072436;
 
-	FileStream a = openFile(test_file_path, FileMode.readWrite);
+	File a = File(test_file_path, "ab+");
 	scope(exit) { remove(test_file_path); }
 
 	a.writeValue(f);
 	a.close();
 
-	a = openFile(test_file_path, FileMode.readWrite);
+	a = File(test_file_path, "ab+");
 	scope(exit) { a.close(); }
 
 	Foo test = a.readValue!Foo();
@@ -170,14 +190,14 @@ unittest {
 
 unittest {
 	 ImageIdSigDcRes image = imageFromFile(1, "test/cat_a2.jpg");
-	 FileStream a = openFile(test_file_path, FileMode.readWrite);
+	 File a = File(test_file_path, "ab+");
 	 scope(exit) { remove(test_file_path); }
 	 scope(exit) { a.close(); }
 
 	 a.writeValue!ImageIdSigDcRes(image);
 	 a.close();
 
-	 a = openFile(test_file_path, FileMode.readWrite);
+	 a = File(test_file_path, "ab+");
 
 	 auto test = a.readValue!ImageIdSigDcRes();
 	 assert(test == image);

@@ -69,6 +69,7 @@ enum PayloadType : ushort {
 	response_pong,
 	response_version,
 	response_list_databases,
+	response_query_results,
 
 	request_create_file_db,
 	request_query_from_path,
@@ -81,7 +82,6 @@ enum PayloadType : ushort {
 	request_ping
 }
 
-
 string[] getPayloadTypesStrings() {
 	string[] ret;
 	foreach(member; __traits(allMembers, PayloadType)) {
@@ -90,14 +90,17 @@ string[] getPayloadTypesStrings() {
 	return ret;
 }
 
+/*
+ * Expands to something like:
+ *  alias Payload = Algebraic!(
+ *	  ResponseDbInfo,
+ *    ... (all the other response/request types)
+ *	  RequestPing);
+ */
 mixin(`
 	alias Payload = Algebraic!(` ~ getPayloadTypesStrings().join(", ") ~ `);
 `);
 
-// Expands to something like:
-//alias Payload = Algebraic!(
-//	ResponseDbInfo,
-//	RequestAddImagePathToDb);
 
 class PayloadException : Exception {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
@@ -197,6 +200,8 @@ void writePayload(P)(TCPConnection conn, P request)
 
 	static if(P.tupleof.length != 0)
 	{
+		import std.traits;
+
 		auto packed = msgpack.pack(request);
 		scope(exit) { GC.free(packed.ptr); }
 

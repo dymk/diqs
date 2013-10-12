@@ -2,23 +2,24 @@ module server;
 
 import types;
 import sig;
+import query;
 
 import net.payload;
 import net.common;
 
 import image_db.file_db : FileDb;
-import image_db.base_db : IdGen;
+import image_db.base_db : BaseDb, IdGen;
 
 import magick_wand.wand;
-
-import persistence_layer.on_disk_persistence;
 
 import std.getopt : getopt;
 import std.stdio : writeln, writefln, stderr;
 import std.variant : Algebraic, tryVisit, visit;
+import std.range : array;
 
 import vibe.core.net : listenTCP;
 import vibe.core.core : runEventLoop, lowerPrivileges;
+import vibe.inet.path : Path;
 import vibe.core.log;
 
 enum VersionMajor = 0;
@@ -67,7 +68,7 @@ int main(string[] args)
 
 			bool found = db.visit!(
 				(FileDb fdb) {
-					return fdb.path() == path;
+					return Path(fdb.path()) == Path(path);
 				},
 				(MemDb mdb) {
 					return false;
@@ -81,18 +82,28 @@ int main(string[] args)
 		return false;
 	}
 
+	BaseDb enforceHasDb(user_id_t db_id)
+	{
+		DbType db = *enforceEx!DatabaseNotFoundException(db_id in databases, "Database isn't loaded");
+
+		return db.visit!(
+			(FileDb fdb) { return cast(BaseDb)fdb; },
+			(MemDb mdb)  { return cast(BaseDb)mdb; }
+		)();
+	}
+
 	void handleConnection(TCPConnection conn) {
 
 		logInfo("Made a connection with %s", conn.peerAddress);
 
 		void handleRequestPing(RequestPing req) {
-			logTrace("Client requested Ping");
+			logDebug("Client requested Ping");
 			conn.writePayload(ResponsePong());
 		}
 
 		void handleRequestVersion(RequestVersion r) {
-			logTrace("Client requested Version");
-			conn.writePayload(ResponseVersion(VersionMajor, VersionMinor, VersionPatch));
+			logDebug("Client requested Version");
+			conn.writePayload!ResponseVersion(ResponseVersion(VersionMajor, VersionMinor, VersionPatch));
 		}
 
 		void handleRequestListDatabases(RequestListDatabases req) {
@@ -128,9 +139,10 @@ int main(string[] args)
 			else static if(is(R == RequestLoadFileDb))
 			{
 				FileDb db = FileDb.loadFromFile(req.db_path, req.create_if_not_exist);
+				logDiagnostic("Loaded database at path %s", req.db_path);
 			}
 			else
-				static assert(false);
+				static assert(false, "Request type must be LoadFileDb or CreateFileDb");
 
 
 			auto db_id = id_gen.next();
@@ -145,18 +157,13 @@ int main(string[] args)
 			is(Req == RequestAddImageFromPath) ||
 			is(Req == RequestAddImageFromPixels))
 		{
-			DbType db = *enforceEx!DatabaseNotFoundException(req.db_id in databases, "Database isn't loaded");
-
-			BaseDb bdb = db.visit!(
-				(FileDb fdb) { return cast(BaseDb)fdb; },
-				(MemDb mdb)  { return cast(BaseDb)mdb; }
-			)();
+			BaseDb bdb = enforceHasDb(req.db_id);
 
 			user_id_t image_id;
-			if(req.generate_id) {
-				image_id = bdb.nextId();
-			} else {
+			if(req.use_image_id) {
 				image_id = req.image_id;
+			} else {
+				image_id = bdb.peekNextId();
 			}
 
 			try {
@@ -171,21 +178,86 @@ int main(string[] args)
 		}
 
 		void handleAddImageFromPath(RequestAddImageFromPath req) {
-			logTrace("Got add image from path request: %s: %s (gen id? %s, id: %d)", req.db_id, req.image_path, req.generate_id, req.image_id);
+			logDebug("Got add image from path request: %s (dbid: %d, use id? %s, id: %d)",
+				req.image_path, req.db_id, req.use_image_id, req.image_id);
 
-			ImageSigDcRes image_data = ImageSigDcRes.fromFile(req.image_path);
+			// This is an ugly workaround to handle ImageMagick not liking
+			// fibers. Perhaps yield this fiber after spawning the thread and
+			// sending the path, and then having the spawned thread signal
+			// for the fiber to resume? More research required.
+			auto imageDataThreadId = spawn(&genImageDataFunc, thisTid);
+			send(imageDataThreadId, req.image_path);
+			ImageSigDcRes image_data = receiveOnly!ImageSigDcRes();
+
+			logDebug("Processed image data (res %dx%d)",
+				image_data.res.width, image_data.res.height);
+
 			addImageData(image_data, req);
 		}
 
 		void handleAddImageFromPixels(RequestAddImageFromPixels req) {
-			scope(exit) { GC.free(req.pixels.ptr); }
+			logDebug("Got add image from pixels request: %s (use id? %s, id: %d)",
+				req.db_id, req.use_image_id, req.image_id);
+
+			scope(exit) {
+				GC.free(req.pixels.ptr);
+			}
 
 			auto wand = MagickWand.getWand();
-			scope(exit) { MagickWand.disposeWand(wand); }
-			wand.importImagePixelsFlatEx(req.width, req.height, req.pixels);
+			scope(exit) {
+				MagickWand.disposeWand(wand);
+			}
+
+			wand.newImageEx(
+				req.pixels_res.width,
+				req.pixels_res.height);
+
+			wand.importImagePixelsFlatEx(
+				req.pixels_res.width,
+				req.pixels_res.height,
+				req.pixels);
+
+			logDebug("Imported wand; image res: %dx%d",
+				wand.imageWidth(), wand.imageHeight());
 
 			ImageSigDcRes image_data = ImageSigDcRes.fromWand(wand);
+			image_data.res = req.original_res;
+
 			addImageData(image_data, req);
+		}
+
+		void handleQueryFromPath(RequestQueryFromPath req)
+		{
+			BaseDb db = enforceHasDb(req.db_id);
+
+			QueryParams qp;
+
+			scope(exit) {
+				GC.free(cast(void*)req.image_path.ptr);
+			}
+
+			auto imageDataThreadId = spawn(&genImageDataFunc, thisTid);
+			send(imageDataThreadId, req.image_path);
+			ImageSigDcRes input = receiveOnly!ImageSigDcRes();
+
+			qp.in_image = &input;
+			qp.num_results = req.num_results;
+
+			scope(exit) {
+				GC.free(query_results.ptr);
+				GC.free(resp_results.ptr);
+			}
+			auto query_results = db.query(qp);
+			auto resp_results = query_results.map!(
+				(result) {
+					return ResponseQueryResults.QueryResult(
+						result.image.user_id,
+						result.similarity,
+						result.image.res);
+				}
+ 			)().array();
+
+			conn.writePayload(ResponseQueryResults(resp_results));
 		}
 
 		while(conn.connected) {
@@ -198,7 +270,9 @@ int main(string[] args)
 					handleRequestListDatabases,
 					handleOpeningFileDatabase!RequestLoadFileDb,
 					handleOpeningFileDatabase!RequestCreateFileDb,
-					handleAddImageFromPath);
+					handleAddImageFromPath,
+					handleAddImageFromPixels,
+					handleQueryFromPath);
 			}
 			catch(DatabaseNotFoundException) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbNotFound));
@@ -220,11 +294,11 @@ int main(string[] args)
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.CantExportPixels));
 			}
 
-			catch(OnDiskPersistence.DbFileAlreadyExistsException e) {
+			catch(FileDb.DbFileAlreadyExistsException e) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileAlreadyExists));
 			}
 
-			catch(OnDiskPersistence.DbFileNotFoundException e) {
+			catch(FileDb.DbFileNotFoundException e) {
 				conn.writePayload(ResponseFailure(ResponseFailure.Code.DbFileNotFound));
 			}
 
@@ -274,4 +348,13 @@ void printHelp() {
       Default value: 127.0.0.1
 `
 	);
+}
+
+// A workaround for MagickWand. Processes MagickWand work in a separate
+// thread, because MagickWand doesn't like fibers.
+import std.concurrency;
+void genImageDataFunc(Tid tid) {
+	receive((string image_path) {
+		send(tid, ImageSigDcRes.fromFile(image_path));
+	});
 }
