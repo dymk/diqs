@@ -140,7 +140,7 @@ final class FileDb : PersistedDb
 	void close() { close(true); }
 	void close(bool enforce_clean) {
 
-		synchronized(m_handle_mutex) {
+		//synchronized(m_handle_mutex) {
 
 			if(enforce_clean) {
 				enforceClean();
@@ -156,14 +156,14 @@ final class FileDb : PersistedDb
 				GC.free(cast(void*)m_mem_db);
 				m_mem_db = null;
 			}
-		}
+		//}
 	}
 
 	bool opened() { return !closed(); }
 	bool closed() {
-		synchronized(m_handle_mutex) {
+		//synchronized(m_handle_mutex) {
 			return m_closed;
-		}
+		//}
 	}
 
 	bool clean() { return !dirty(); }
