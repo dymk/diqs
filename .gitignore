@@ -20,9 +20,9 @@ Release/*
 Unittest/*
 test/ignore/*
 
-server
-server.exe
-client
-client.exe
-test_runner
-test_runner.exe
+/server
+/server.exe
+/client
+/client.exe
+/test_runner
+/test_runner.exe
