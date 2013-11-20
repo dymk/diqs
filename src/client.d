@@ -253,7 +253,7 @@ int main(string[] args)
 			bool use_image_id = (cmd_parts.length == 3);
 
 			user_id_t image_id;
-			if(!use_image_id) {
+			if(use_image_id) {
 				formattedRead(cmd_parts[2], "%d", &image_id);
 			}
 

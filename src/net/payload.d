@@ -8,6 +8,7 @@ import std.string : format;
 import std.array : join;
 import std.algorithm;
 import std.socket;
+import std.stdio;
 
 import util : snakeToPascalCase, pascalToSnakeCase;
 import net.common;
@@ -186,7 +187,9 @@ template PayloadCase(alias PayloadType type, alias Variant)
 				buffer = new ubyte[](length);
 
 				assert(conn.receive(buffer) == length);
+				writeln("Got bytes from connectin: ", buffer);
 				msgpack.unpack(buffer, variant);
+
 
 				ret = variant;
 				break;`;
@@ -233,6 +236,8 @@ void writePayload(P)(Socket conn, P payload)
 
 			auto packed = msgpack.pack(payload);
 			scope(exit) { GC.free(packed.ptr); }
+
+			writeln("Sending packed bytes: ", packed);
 
 			// Hopefully the server doens't send an object over 4gb
 			uint length = cast(uint)packed.length;
