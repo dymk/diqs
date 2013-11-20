@@ -1,0 +1,12 @@
+[submodule "vendor/msgpack-d"]
+	path = vendor/msgpack-d
+	url = https://github.com/msgpack/msgpack-d.git
+[submodule "vendor/vibe-d"]
+	path = vendor/vibe-d
+	url = https://github.com/rejectedsoftware/vibe.d.git
+[submodule "vendor/openssl"]
+	path = vendor/openssl
+	url = https://github.com/s-ludwig/openssl.git
+[submodule "vendor/libevent"]
+	path = vendor/libevent
+	url = https://github.com/D-Programming-Deimos/libevent.git

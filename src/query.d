@@ -45,7 +45,7 @@ struct QueryParams
 	bool ignore_color = false;
 	bool is_sketch = false;
 
-	auto perform(T)(BucketManager bucket_manager, T[] db_images) const
+	QueryResult[] perform(T)(BucketManager bucket_manager, T[] db_images) const
 	if(is(typeof(T.init.dc) : ImageDc))
 	{
 		immutable num_results  = min(this.num_results, db_images.length);
@@ -139,10 +139,10 @@ struct QueryParams
 			//float sim = (cast(float)(-match.score) / cast(float)total_bucket_weight * 100.0);
 			//float sim = cast(float)(match.score);
 
-			// Yes, percentages can be negative for now. Perhaps clamp sim to [0, 100] regardless? 
+			// Yes, percentages can be negative for now. Perhaps clamp sim to [0, 100] regardless?
 			float sim = cast(float)(-match.score) / cast(float)(total_bucket_weight) * 100.0;
 
-			// Maybe? 
+			// Maybe?
 			sim = max(0.0, sim);
 
 			results[index] = QueryResult(match.image, sim);

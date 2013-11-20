@@ -26,11 +26,12 @@ import types :
 import haar : haar2d;
 import util : largestCoeffs;
 
-import std.exception : enforce;
+import std.exception : enforceEx;
 import std.algorithm : map, copy, filter;
 import std.range : array;
 import std.string : format;
 import std.stdio : writeln;
+import std.file : exists;
 import core.memory : GC;
 
 struct CoeffIPair
@@ -54,6 +55,15 @@ struct ImageSig
 	ref auto y() @property { return sigs[0]; }
 	ref auto i() @property { return sigs[1]; }
 	ref auto q() @property { return sigs[2]; }
+
+	static MagickWand resizeWand(MagickWand wand)
+	{
+		if(wand.imageWidth() != ImageWidth || wand.imageHeight() != ImageHeight)
+		{
+			wand.scaleImageEx(ImageWidth, ImageHeight);
+		}
+		return wand;
+	}
 
 	version(assert)
 	{
@@ -108,31 +118,19 @@ struct ImageSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	static auto fromFile(string file)
+	static auto fromWand(MagickWand wand)
 	{
-		auto ret = ImageSigDcRes();
+		ImageSigDcRes ret;
 
-		auto wand = MagickWand.getWand();
-		scope(exit) {
-			MagickWand.disposeWand(wand);
-		}
-
-		enforce(wand.readImage(file), "Couldn't read file: " ~ file);
 		short
 		  width = cast(res_t)wand.imageWidth(),
 		  height = cast(res_t)wand.imageHeight();
 		ret.res = ImageRes(width, height);
 
-		//enforce(wand.resizeImage(ImageWidth, ImageHeight, FilterTypes.CubicFilter, 1.0));
-		if(width != ImageWidth || height != ImageHeight)
-		{
-			enforce(wand.scaleImage(ImageWidth, ImageHeight));
-		}
+		ImageSig.resizeWand(wand);
 
-		auto pixels = wand.exportImagePixelsFlat!YIQ();
-		scope(exit) { GC.free(pixels.ptr); }
-
-		enforce(pixels);
+		auto pixels = wand.exportImagePixelsFlatEx!YIQ();
+		//scope(exit) { GC.free(pixels.ptr); }
 
 		scope ychan = pixels.map!(a => cast(coeff_t)a.y).array();
 		scope ichan = pixels.map!(a => cast(coeff_t)a.i).array();
@@ -151,27 +149,38 @@ struct ImageSigDcRes
 		scope qlargest = largestCoeffs(qchan[], NumSigCoeffs, 1);
 
 		auto sig = ImageSig();
+
 		// Add 1 to all of the indexes, because largestCoeff was passed the tail of
 		// the channel, so all coeffs' indexes were shifted left.
 		// If coeff is negative, make the index negative as well.
 		ylargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.y[]);
 		ilargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.i[]);
 		qlargest.map!(a => a.coeff < 0 ? -a.index : a.index)().copy(sig.q[]);
+
 		ret.sig = sig;
 
-		//version(assert) {
+		version(assert) {
 			foreach(sig_t s; ret.sig.sigs) {
 				if(filter!(a => a == 0)(s[]).array().length != 0)
 				{
-					writeln(format("0 coeff found in sig of %s: %s", file, s[]));
+					writeln(format("0 coeff found in sig: %s", s[]));
 					writeln("First set from the chan: ", ychan[0..10]);
 					writeln("DC: ", ret.dc);
 					assert(false);
 				}
 			}
-		//}
+		}
 
 		return ret;
+
+	}
+
+	static auto fromFile(string file)
+	{
+		auto wand = MagickWand.fromFile(file);
+		scope(exit) { MagickWand.disposeWand(wand); }
+
+		return ImageSigDcRes.fromWand(wand);
 	}
 }
 
@@ -192,21 +201,51 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	version(unittest) {
-		bool sameAs(ImageIdSigDcRes other) const {
-			return (
-				other.user_id == this.user_id &&
-				other.dc == this.dc &&
-				other.res == this.res &&
-				other.sig.sameAs(this.sig));
-		}
-	}
 }
 
 version(unittest) {
-	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
-		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
-		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
-		return img;
+	bool sameAs(ImageIdSigDcRes a, ImageIdSigDcRes b) {
+		return (
+			a.user_id == b.user_id &&
+			     a.dc == b.dc &&
+			    a.res == b.res &&
+			a.sig.sameAs(b.sig));
 	}
+}
+
+version(unittest)
+{
+	ImageSigDcRes*[string] alreadyLoaded;
+
+	ImageIdSigDcRes imageFromFile(user_id_t id, string path)
+	{
+		auto i = imageFromFile(path);
+		return ImageIdSigDcRes(id, i.sig, i.dc, i.res);
+	}
+
+	ImageSigDcRes imageFromFile(string path)
+	{
+		if(path !in alreadyLoaded)
+		{
+			writeln("Caching signature for image " ~ path);
+			auto allocd = new ImageSigDcRes;
+			auto reted = ImageSigDcRes.fromFile(path);
+
+			allocd.sig = reted.sig;
+			allocd.dc = reted.dc;
+			allocd.res = reted.res;
+
+			alreadyLoaded[path] = allocd;
+		}
+
+		auto i = alreadyLoaded[path];
+		return ImageSigDcRes(i.sig, i.dc, i.res);
+	}
+}
+
+unittest
+{
+	ImageSigDcRes data = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	assert(data.res == ImageRes(650, 433));
+	assert(data != ImageSigDcRes.init);
 }

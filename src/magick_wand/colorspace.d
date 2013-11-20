@@ -17,6 +17,7 @@ struct YIQ {
 	}
 }
 
+YIQ toYIQ(YIQ c) { return c; }
 YIQ toYIQ(RGB c) {
 	/*
 	 * http://www.eembc.org/techlit/datasheets/yiq_consumer.pdf
@@ -49,6 +50,7 @@ unittest {
 	assert(rgb_2_yiq == yiq);
 }
 
+RGB toRGB(RGB c) { return c; }
 RGB toRGB(YIQ c) {
 	/*
 	 * http://www.cs.rit.edu/~ncs/color/t_convert.html

@@ -6,20 +6,29 @@
 		"Dylan Knutson"
 	],
 
-	"sourceFiles": [
-		"vendor/dcollections/HashMap.d",
-		"vendor/dcollections/Hash.d",
-		"vendor/dcollections/Link.d",
-		"vendor/dcollections/DefaultAllocator.d",
-		"vendor/dcollections/util.d",
-		"vendor/dcollections/DefaultFunctions.d",
-		"vendor/dcollections/model/Map.d",
-		"vendor/dcollections/model/Keyed.d",
-		"vendor/dcollections/model/Iterator.d"
-	],
-
 	"dependencies": {
+		"vibe-d": "~master"
 	},
+
+	"sourceFiles": ["vendor/msgpack-d/src/msgpack.d"],
+	"importPaths": ["vendor/msgpack-d/src"],
+
+	"versions": ["VibeCustomMain"],
+	"targetType": "none",
+	"configurations": [
+		{
+			"name": "client",
+			"targetName": "client",
+			"targetType": "executable",
+			"excludedSourceFiles": ["src/server.d"]
+		},
+		{
+			"name": "server",
+			"targetName": "server",
+			"targetType": "executable",
+			"excludedSourceFiles": ["src/client.d"]
+		}
+	],
 
 	"libs-linux": ["MagickWand", "MagickCore"]
 }

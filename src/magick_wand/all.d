@@ -28,3 +28,4 @@ public import magick_wand.types;
 public import magick_wand.funcs;
 public import magick_wand.colorspace;
 public import magick_wand.wand;
+public import magick_wand.pixel;
