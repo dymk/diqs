@@ -21,20 +21,23 @@ import std.exception : enforce;
 import std.conv : to;
 
 // A wrapper struct for easy passing and manipulation of bucket sizes.
-struct BucketSizes {
+struct BucketSizes
+ {
 	uint[NumBuckets] sizes;
 
 	uint[] Y() { return forChan(0); }
 	uint[] I() { return forChan(1); }
 	uint[] Q() { return forChan(2); }
 
-	uint[] forChan(ubyte chan) {
+	uint[] forChan(ubyte chan)
+	{
 		enforce(chan < NumColorChans);
 		return sizes[(chan * NumBucketsPerChan) .. ((chan+1) * NumBucketsPerChan)];
 	}
 }
 
-unittest {
+unittest
+{
 	BucketSizes bs;
 	bs.Y()[0] = 12;
 	assert(bs.Y().length == NumBucketsPerChan);
@@ -43,12 +46,14 @@ unittest {
 
 final class BucketManager
 {
-	this() {
+	this()
+	{
 		foreach(ref chan; m_buckets)
 		{
-			chan = new Bucket[NumBucketsPerChan];
+			chan = new Bucket[](NumBucketsPerChan);
 		}
 	}
+
 
 	void addSig(intern_id_t id, in ImageSig sig)
 	{
@@ -90,7 +95,11 @@ final class BucketManager
 					found++;
 				}
 			}
-			enforce(found == NumSigCoeffs, "Image with internal ID " ~ to!string(intern_id) ~ " didn't have enough coeffs (found: " ~ to!string(found) ~ ")");
+
+			enforce(found == NumSigCoeffs,
+				"Image with internal ID " ~
+				to!string(intern_id) ~
+				" didn't have enough coeffs (found: " ~ to!string(found) ~ ")");
 		}
 		this._length--;
 		return ret;
@@ -153,18 +162,20 @@ private:
 	Bucket[][NumColorChans] m_buckets;
 }
 
-unittest {
-	auto f = new BucketManager();
-	assert(f.buckets().length);
-}
 
 version(unittest)
 {
-	import sig : ImageSigDcRes;
-	static immutable ImageSig sig;
-	static this() {
-		sig = ImageSigDcRes.fromFile("test/cat_a1.jpg").sig;
+	import sig : imageFromFile;
+
+	ImageSig getSig()
+	{
+		return imageFromFile("test/cat_a1.jpg").sig;
 	}
+}
+
+unittest {
+	auto f = new BucketManager();
+	assert(f.buckets().length);
 }
 
 unittest {
@@ -192,30 +203,30 @@ unittest {
 
 unittest {
 	auto f = new BucketManager();
-	f.addSig(1, sig);
+	f.addSig(1, getSig());
 	assert(f.length == 1);
 }
 
 unittest {
 	auto f = new BucketManager();
-	f.addSig(1, sig);
+	f.addSig(1, getSig());
 	f.removeId(1);
 	assert(f.length == 0);
 }
 
 unittest {
 	auto f = new BucketManager();
-	f.addSig(1, sig);
+	f.addSig(1, getSig());
 	auto ret = f.removeId(1);
-	assert(ret.sameAs(sig));
+	assert(ret.sameAs(getSig()));
 }
 
 unittest {
 	auto f = new BucketManager();
-	f.addSig(1, sig);
+	f.addSig(1, getSig());
 	f.moveId(1, 2);
 	auto ret = f.removeId(2);
-	assert(ret.sameAs(sig));
+	assert(ret.sameAs(getSig()));
 }
 
 unittest {

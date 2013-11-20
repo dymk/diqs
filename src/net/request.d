@@ -9,8 +9,8 @@ struct RequestCreateFileDb {
 }
 
 struct RequestLoadFileDb {
-	bool create_if_not_exist = false;
 	string db_path;
+	bool create_if_not_exist = false;
 }
 
 struct RequestQueryFromPath {
@@ -58,3 +58,5 @@ struct RequestPing {}
 struct RequestListDatabases {}
 
 struct RequestVersion {}
+
+struct RequestServerShutdown {}

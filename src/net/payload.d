@@ -3,17 +3,19 @@ module net.payload;
 import msgpack;
 
 import std.exception : enforce, enforceEx;
-import std.variant : Algebraic;
-import std.format : format;
+import std.variant;
+import std.string : format;
 import std.array : join;
-
-import vibe.core.net : TCPConnection;
+import std.algorithm;
+import std.socket;
 
 import util : snakeToPascalCase, pascalToSnakeCase;
 import net.common;
+
 public import net.response;
 public import net.request;
 public import net.db_info;
+
 
 /**
  * The basics of a request/response cycle:
@@ -70,7 +72,9 @@ enum PayloadType : ushort {
 	response_version,
 	response_list_databases,
 	response_query_results,
+	response_server_shutdown,
 
+	request_server_shutdown,
 	request_create_file_db,
 	request_query_from_path,
 	request_list_databases,
@@ -82,7 +86,8 @@ enum PayloadType : ushort {
 	request_ping
 }
 
-string[] getPayloadTypesStrings() {
+string[] getPayloadTypesStrings()
+{
 	string[] ret;
 	foreach(member; __traits(allMembers, PayloadType)) {
 		ret ~=  member.snakeToPascalCase();
@@ -112,12 +117,12 @@ final class InvalidPayloadException : PayloadException {
 
 // A generic function for reading an algebraic datatype from
 // a stream. determine_payload does the work of returning
-// a Payload variant for the PayloadType read from the TCPConnection,
+// a Payload variant for the PayloadType read from the Socket,
 // given the buffer that was read from the stream. It should be
 // implemented as a final switch in most cases.
 
-// TODO: make TCPConnection an InputStream instead?
-Payload readPayload(TCPConnection conn) {
+// TODO: make Socket an InputStream instead?
+Payload readPayload(Socket conn) {
 	auto type = conn.readValue!PayloadType;
 	if(type < PayloadType.min || type > PayloadType.max) {
 		throw new InvalidPayloadException(format("Invalid PayloadType value sent: %d", cast(uint)type));
@@ -180,7 +185,7 @@ template PayloadCase(alias PayloadType type, alias Variant)
 				length = conn.readValue!uint();
 				buffer = new ubyte[](length);
 
-				conn.read(buffer);
+				assert(conn.receive(buffer) == length);
 				msgpack.unpack(buffer, variant);
 
 				ret = variant;
@@ -188,27 +193,53 @@ template PayloadCase(alias PayloadType type, alias Variant)
 	}
 }
 
-void writePayload(P)(TCPConnection conn, P request)
+/**
+ * writePayload writes a given Payload type,
+ */
+void writePayload(P)(Socket conn, P payload)
 {
 
-	mixin(q{
-		conn.writeValue!PayloadType(PayloadType.} ~ P.stringof.pascalToSnakeCase() ~ q{);
-	});
-
-	// Expands to something like this, if P is ResponseSuccess:
-	// conn.writeValue!PayloadType(PayloadType.response_success);
-
-	static if(P.tupleof.length != 0)
+	static if(is(P == Payload))
 	{
-		import std.traits;
+		// A Payload type was passed in, match on it and call a
+		// specialized writePayload
 
-		auto packed = msgpack.pack(request);
-		scope(exit) { GC.free(packed.ptr); }
+		// Expands to a list of lambdas which call a specialized writePayload
+		// for each differnet Payload variant
+		const string payloadHandlers = getPayloadTypesStrings().map!(
+			(payload_type_str) {
+				return "(" ~ payload_type_str ~ " p) { conn.writePayload!" ~ payload_type_str ~ "(p); } ";
+			}
+		)().join(", ");
 
-		// Hopefully the server doens't send an object over 4gb
-		uint length = cast(uint)packed.length;
+		// Pass that list into visit!()
+		mixin("payload.visit!(" ~ payloadHandlers ~ ")();");
+	}
+	else
+	{
+		// A Payload variant was directly passed in, figure out how to serialize
+		// it
 
-		conn.writeValue!uint(length);
-		conn.write(packed);
+		mixin(
+			"conn.writeValue!PayloadType(PayloadType." ~ P.stringof.pascalToSnakeCase()
+			~ ");");
+
+		// Expands to something like this, if P is ResponseSuccess:
+		// conn.writeValue!PayloadType(PayloadType.response_success);
+
+		static if(P.tupleof.length != 0)
+		{
+			import std.traits;
+
+			auto packed = msgpack.pack(payload);
+			scope(exit) { GC.free(packed.ptr); }
+
+			// Hopefully the server doens't send an object over 4gb
+			uint length = cast(uint)packed.length;
+
+			conn.writeValue!uint(length);
+			assert(conn.send(packed) == packed.length);
+		}
+
 	}
 }

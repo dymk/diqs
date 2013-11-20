@@ -5,6 +5,7 @@ import types;
 import image_db.mem_db : MemDb;
 import image_db.file_db : FileDb;
 import net.db_info : DbInfo;
+import net.common;
 
 struct ResponseDbInfo {
 	this(user_id_t id, MemDb _db) {
@@ -19,6 +20,8 @@ struct ResponseDbInfo {
 }
 
 struct ResponseSuccess {}
+
+struct ResponseServerShutdown {}
 
 struct ResponseImageAdded {
 	user_id_t db_id;
@@ -58,6 +61,11 @@ struct ResponseVersion {
 	int major;
 	int minor;
 	int patch;
+
+	string versionString()
+	{
+		return format("%d.%d.%d", major, minor, patch);
+	}
 }
 
 struct ResponseListDatabases {

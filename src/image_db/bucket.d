@@ -35,6 +35,8 @@ struct Bucket
 		IdContainer* dq;
 
 		if(m_id_sets[].empty || !m_id_sets[][$-1].has_room(id)) {
+
+			// The length to allocate for the new IdContainer
 			int container_len;
 
 			if(this.size_hint <= 0)
@@ -49,12 +51,11 @@ struct Bucket
 				// 1000 (arbitrary) so really small sets aren't created in case
 				// size_hint was small.
 				// Effectivly ensure that 1000 < container_len <
-				//container_len = max(min(MAX_SET_LEN, size_hint), 1000);
 				container_len = min(MAX_SET_LEN, size_hint);
 				size_hint -= container_len;
 			}
 
-			m_id_sets.append(IdContainer(container_len));
+			m_id_sets ~= IdContainer(container_len);
 		}
 
 		dq = &m_id_sets[][$-1];
@@ -80,14 +81,18 @@ struct Bucket
 
 	Range opSlice()
 	{
-		return Range(m_id_sets[]);
+		return Range(m_id_sets);
 	}
 
 	size_t length() {
-		return reduce!((a, b) => a + b)(cast(size_t)0, m_id_sets[].map!(a => a.length));
+		alias sum = reduce!((a, b) => a + b);
+
+		return sum(
+			cast(size_t) 0,
+			m_id_sets.map!(a => a.length));
 	}
 
-	struct Range
+	static struct Range
 	{
 		this(IdContainer[] sets)
 		{
@@ -125,7 +130,7 @@ struct Bucket
 
 private:
 	int size_hint;
-	ReservedArray!IdContainer m_id_sets;
+	IdContainer[] m_id_sets;
 }
 
 version(unittest) {

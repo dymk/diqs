@@ -4,10 +4,15 @@ ifeq (64,$(MODEL))
   DC_FLAGS += -m64
 endif
 
+ifeq (dmd,$(DC))
+  # DC_FLAGS += -allinst
+endif
+
+
 ifeq ($(OS),Windows_NT)
   EXE_EXT :=.exe
   ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
-  	$(info Compiler is DMD)
+    $(info Compiler is DMD)
     OBJ_EXT :=.obj
   else
     $(info Compiler is NOT DMD)
@@ -18,13 +23,20 @@ else
   EXE_EXT :=
 endif
 
+# Adding the -release flag causes linker errors for some reason
+# (even with -allinst)
 RELEASE_FLAGS         += -O -release -noboundscheck -inline
+# RELEASE_FLAGS         += -O -noboundscheck -inline
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 DEBUG_FLAGS           += -debug -gc
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
-SERVER_FILES = src/server.d
+SERVER_FILES = \
+  src/server/server.d \
+  src/server/context.d \
+  src/server/connection_handler.d
+
 CLIENT_FILES = src/client.d
 TEST_RUNNER_FILES = src/test_runner.d
 
@@ -44,6 +56,9 @@ DIQS_FILES := \
   src/image_db/mem_db.d \
   src/image_db/base_db.d \
   src/image_db/persisted_db.d \
+  src/image_db/file_db_unittests.d \
+  src/image_db/file_db.d \
+  src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \
   src/haar.d \
@@ -56,14 +71,6 @@ DIQS_FILES := \
 MAGICKWAND_OBJ   := magickwand$(OBJ_EXT)
 MAGICKWAND_FILES := $(shell ls src/magick_wand/*.d)
 
-# A workaround for a DMD bug which prevents some file operations from being
-# unittestable.
-NONUNITTESTED_OBJ := non-unittested$(OBJ_EXT)
-NONUNITTESTED_FILES := \
-  src/image_db/file_db_unittests.d \
-  src/persistence_layer/file_helpers.d \
-  src/image_db/file_db.d \
-
 MSGPACK_DIR   := vendor/msgpack-d/src
 MSGPACK_OBJ   := msgpack$(OBJ_EXT)
 MSGPACK_FILES := $(MSGPACK_DIR)/msgpack.d
@@ -72,52 +79,65 @@ PAYLOAD_FILES := $(shell ls src/net/*.d)
 PAYLOAD_OBJ   := payload$(OBJ_EXT)
 
 # ====================================================================
-VIBE_DIR   := vendor/vibe-d/source
-VIBE_OBJ := vibe-d$(OBJ_EXT)
-VIBE_FILES := $(shell find \
-  vendor/vibe-d/source/vibe/core \
-  vendor/vibe-d/source/vibe/data \
-  -name '*.d' -printf "%p ") \
-  $(VIBE_DIR)/vibe/utils/hashmap.d \
-  $(VIBE_DIR)/vibe/utils/memory.d \
-  $(VIBE_DIR)/vibe/utils/array.d \
-  $(VIBE_DIR)/vibe/utils/string.d \
-  $(VIBE_DIR)/vibe/inet/path.d \
-  $(VIBE_DIR)/vibe/inet/url.d \
-  $(VIBE_DIR)/vibe/textfilter/urlencode.d \
-  $(VIBE_DIR)/vibe/textfilter/html.d
+# VIBE_DIR   := vendor/vibe-d/source
+# VIBE_OBJ := vibe-d$(OBJ_EXT)
+# VIBE_FILES := $(shell find \
+#   vendor/vibe-d/source/vibe/core \
+#   vendor/vibe-d/source/vibe/data \
+#   -name '*.d') \
+#   $(VIBE_DIR)/vibe/utils/hashmap.d \
+#   $(VIBE_DIR)/vibe/utils/memory.d \
+#   $(VIBE_DIR)/vibe/utils/array.d \
+#   $(VIBE_DIR)/vibe/utils/string.d \
+#   $(VIBE_DIR)/vibe/inet/path.d \
+#   $(VIBE_DIR)/vibe/inet/url.d \
+#   $(VIBE_DIR)/vibe/textfilter/urlencode.d \
+#   $(VIBE_DIR)/vibe/textfilter/html.d \
+#   $(VIBE_DIR)/vibe/internal/meta/uda.d \
+#   $(VIBE_DIR)/vibe/internal/meta/traits.d
+
 
 ifeq ($(OS),Windows_NT)
-  ifeq (64,$(MODEL))
-    LIBS := \
-      $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
-      $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
-  else
-    LIBS := \
-      $(VIBE_DIR)/../lib/win-i386/event2.lib \
-      $(VIBE_DIR)/../lib/win-i386/eay.lib \
-      $(VIBE_DIR)/../lib/win-i386/ssl.lib
-  endif
+  # ifeq (64,$(MODEL))
+  #   LIBS := \
+  #     $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
+  #     $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
+  # else
+  #   LIBS := \
+  #     $(VIBE_DIR)/../lib/win-i386/event2.lib \
+  #     $(VIBE_DIR)/../lib/win-i386/eay.lib \
+  #     $(VIBE_DIR)/../lib/win-i386/ssl.lib
+  # endif
 
-  VIBE_VERSIONS := -version=VibeWin32Driver
+  # VIBE_VERSIONS := -version=VibeWin32Driver
   # LIBS := wsock32.lib ws2_32.lib user32.lib
 else
-  VIBE_VERSIONS := -version=VibeLibeventDriver
-  LIBS := -L-levent -L-levent_pthreads -L-lssl -L-lcrypto -L-lMagickWand -L-lMagickCore
+  # VIBE_VERSIONS := -version=VibeLibeventDriver
+  # LIB_STRING := $(shell pkg-config --libs MagickWand libevent libcrypto libssl)
+  LIB_STRING := $(shell pkg-config --libs MagickWand)
+
+  # Preprend -L onto each linker flag (required by (l)dmd)
+  LIBS = $(foreach lib,$(LIB_STRING),-L$(lib))
+
+  # Ends up looking like this:
+  # LIBS := -L-L/opt/local/lib -L-levent -L-levent_pthreads -L-lssl -L-lcrypto -L-lMagickWand -L-lMagickCore
 endif
 # ====================================================================
 
-COMMON_OBJS = $(MAGICKWAND_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(NONUNITTESTED_OBJ)
+# COMMON_OBJS = $(MAGICKWAND_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
+COMMON_OBJS = $(MAGICKWAND_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
 
 # ====================================================================
-OPENSSL_DIR  := vendor/openssl
-LIBEVENT_DIR := vendor/libevent
+# OPENSSL_DIR  := vendor/openssl
+# LIBEVENT_DIR := vendor/libevent
 # ====================================================================
 
-INCLUDE_DIRS = -I$(VIBE_DIR) -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LIBEVENT_DIR)
+# INCLUDE_DIRS = -I$(VIBE_DIR) -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LIBEVENT_DIR) -Ivendor/openssl
+INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR)
 
-VERSIONS = -version=VibeCustomMain $(VIBE_VERSIONS)
-DC_FLAGS += $(VERSIONS) $(INCLUDE_DIRS)
+# VERSIONS = -version=VibeCustomMain $(VIBE_VERSIONS)
+# DC_FLAGS += $(VERSIONS) $(INCLUDE_DIRS)
+DC_FLAGS += $(INCLUDE_DIRS)
 
 ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN)
 # ALL_BIN = $(SERVER_BIN)
@@ -135,7 +155,7 @@ release: $(ALL_BIN)
 
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
-unittest: $(TEST_RUNNER_BIN)
+unittest: $(TEST_RUNNER_BIN) $(SERVER_BIN) $(CLIENT_BIN)
 	./$(TEST_RUNNER_BIN)
 
 .PHONY: unittest_diskio
@@ -178,12 +198,8 @@ $(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
 $(DIQS_OBJ):        $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
-# A workaround due to bugs in unittesting certain files.
-$(NONUNITTESTED_OBJ): $(NONUNITTESTED_FILES)
-	$(DC) $(DC_FLAGS)   $(NONUNITTESTED_FILES) -c -of$(NONUNITTESTED_OBJ)
-
-$(VIBE_OBJ):        $(VIBE_FILES)
-	$(DC) $(DC_FLAGS) $(VIBE_FILES) -c -of$(VIBE_OBJ)
+# $(VIBE_OBJ):        $(VIBE_FILES)
+# 	$(DC) $(DC_FLAGS) $(VIBE_FILES) -c -of$(VIBE_OBJ)
 
 $(MSGPACK_OBJ):     $(MSGPACK_FILES)
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)

@@ -11,26 +11,12 @@ import core.memory : GC;
 import core.sync.mutex : Mutex;
 
 import std.stdio : File, writeln;
-//import vibe.core.file :
-//  existsFile,
-//  openFile,
-//  FileMode,
-//  FileStream;
+import std.file : exists;
 
 import persistence_layer.file_helpers;
-import types :
-  user_id_t,
-  intern_id_t,
-  coeffi_t,
-  sig_t,
-  chan_t;
+import types;
+import sig;
 
-import sig :
-  ImageIdSigDcRes,
-  ImageSigDcRes,
-  ImageSig,
-  ImageRes,
-  ImageDc;
 
 import image_db.bucket_manager : BucketManager, BucketSizes;
 import image_db.base_db        : BaseDb, IdGen;
@@ -85,7 +71,7 @@ final class FileDb : PersistedDb
 	 */
 	static FileDb createFromFile(string path)
 	{
-		if(existsFile(path)) {
+		if(exists(path)) {
 			throw new DbFileAlreadyExistsException(path);
 		}
 		return loadFromFile(path, true);
@@ -153,7 +139,6 @@ final class FileDb : PersistedDb
 
 			if(m_mem_db !is null) {
 				m_mem_db.destroy();
-				GC.free(cast(void*)m_mem_db);
 				m_mem_db = null;
 			}
 		//}
@@ -328,7 +313,7 @@ private:
 
 	this(string path, bool create_if_nonexistant)
 	{
-		if(!existsFile(path))
+		if(!exists(path))
 		{
 			if(create_if_nonexistant) {
 

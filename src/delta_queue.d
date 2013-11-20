@@ -22,7 +22,7 @@ struct DeltaQueue(run_start_t)
 	// to be passed in at some point or another. Reserves enough
 	// space for 16 marker bytes.
 	auto reserve(size_t amt) {
-		return data.reserve(amt + (16*(run_start_t.sizeof+1)));
+		return reserve_exact(amt + (16*(run_start_t.sizeof+1)));
 	}
 
 	// Reserves an exact number of bytes. Used mostly internally
@@ -35,7 +35,7 @@ struct DeltaQueue(run_start_t)
 	// push `num` to the internal data store.
 	bool has_room(run_start_t num) {
 		// Can the number be stored as a delta value, or as a new run?
-		auto delta_can_fit = num > last_value && (num - last_value <= ubyte.max);
+		bool delta_can_fit = num > last_value && (num - last_value <= ubyte.max);
 		auto required_bytes  = delta_can_fit ? ubyte.sizeof : run_start_t.sizeof;
 		return data.capacity > (data.length + required_bytes);
 	}
@@ -90,7 +90,7 @@ struct DeltaQueue(run_start_t)
 		// impact run speed by too much, because delta_queues are typically
 		// only a few thousand elements long.
 
-		// Basic speed hack to not allocate oodles of memory and then not
+		// Basic check to not allocate oodles of memory and then not
 		// remove any values.
 		if(!this.has(rm_value))
 		{
@@ -112,10 +112,6 @@ struct DeltaQueue(run_start_t)
 			}
 		}
 
-		// Not exactly safe, so don't retain references to
-		// ranges returned by delta_queues longer than you
-		// really need to.
-		GC.free(data.ptr);
 		this.data = d.data;
 		this._length = d.length;
 
