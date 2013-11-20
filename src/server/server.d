@@ -25,10 +25,10 @@ import std.getopt : getopt;
 import std.range : array;
 import core.sync.mutex : Mutex;
 
-// Version 0.0.1
+// Version 0.0.2
 enum VersionMajor = 0;
 enum VersionMinor = 0;
-enum VersionPatch = 1;
+enum VersionPatch = 2;
 enum ServerVersion = ResponseVersion(VersionMajor, VersionMajor, VersionPatch);
 
 private {
