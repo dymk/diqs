@@ -23,10 +23,14 @@ else
   EXE_EXT :=
 endif
 
-# Adding the -release flag causes linker errors for some reason
+# Adding the -release flag on DMD causes linker errors for some reason
 # (even with -allinst)
-RELEASE_FLAGS         += -O -release -noboundscheck -inline
-# RELEASE_FLAGS         += -O -noboundscheck -inline
+ifeq (dmd,$(DC))
+  RELEASE_FLAGS         += -O -noboundscheck -inline
+else
+  RELEASE_FLAGS         += -O -release -noboundscheck -inline
+endif
+
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 DEBUG_FLAGS           += -debug -gc
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)

@@ -1,3 +1,4 @@
+.DS_Store
 *.o
 *.exe
 *.txt
@@ -19,6 +20,7 @@ Debug/*
 Release/*
 Unittest/*
 test/ignore/*
+test/*.db
 
 /server
 /server.exe

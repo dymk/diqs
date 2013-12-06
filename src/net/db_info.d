@@ -49,8 +49,7 @@ struct DbInfo {
 
 private:
 	this(user_id_t id, BaseDb db) {
-		this.type = type;
-
+		this.id = id;
 		this.num_images = db.numImages();
 	}
 }

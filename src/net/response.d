@@ -48,11 +48,18 @@ struct ResponseFailure {
 		// Signature insertion into DB errors
 		AlreadyHaveId,
 
+		// The payload sent by the client isn't known (or implemented)
+		UnknownPayload,
+
 		// All else
 		UnknownException
 	}
 
 	Code code;
+}
+
+struct ResponseUnpersistableDb {
+	user_id_t db_id;
 }
 
 struct ResponsePong {}

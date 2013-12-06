@@ -30,6 +30,11 @@ struct RequestAddImageFromPath {
 	user_id_t image_id;
 
 	string image_path;
+
+	// Save the database after the image has been added
+	// Make false to keep the DB dirty (e.g., not syced with
+	// the disk)
+	bool flush_db_after_add = true;
 }
 
 struct RequestAddImageFromPixels {
@@ -46,11 +51,18 @@ struct RequestAddImageFromPixels {
 	ImageRes pixels_res;
 
 	RGB[] pixels;
+
+	// See RequestAddImageFromPath
+	bool flush_db_after_add = true;
 }
 
 struct RequestRemoveImage {
 	user_id_t database_id;
 	user_id_t image_id;
+}
+
+struct RequestFlushDb {
+	user_id_t db_id;
 }
 
 struct RequestPing {}

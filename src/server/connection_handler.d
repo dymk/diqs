@@ -9,6 +9,7 @@ import net.common;
 import magick_wand.wand;
 import image_db.file_db;
 import image_db.mem_db;
+import image_db.persisted_db;
 import image_db.base_db;
 
 import server.server;
@@ -35,35 +36,21 @@ void handleClientRequest(Socket conn, Context context)
     response = request.tryVisit!(
       handleRequestPing,
       handleRequestVersion,
-      (RequestServerShutdown req)
-      {
-        return handleRequestShutdown(req, context);
-      },
-      (RequestListDatabases req)
-      {
-        return handleRequestListDatabases(req, context);
-      },
-      (RequestLoadFileDb req)
-      {
-        return handleOpeningFileDatabase(req, context);
-      },
-      (RequestCreateFileDb req)
-      {
-        return handleOpeningFileDatabase(req, context);
-      },
+      (RequestServerShutdown req) { return handleRequestShutdown(req, context);      },
+      (RequestListDatabases req)  { return handleRequestListDatabases(req, context); },
+      (RequestLoadFileDb req)     { return handleOpeningFileDatabase(req, context);  },
+      (RequestCreateFileDb req)   { return handleOpeningFileDatabase(req, context);  },
       (RequestAddImageFromPath req)
-      {
-        return handleAddImageFromPath(req, context);
-      },
+                                  { return handleAddImageFromPath(req, context);     },
       (RequestAddImageFromPixels req)
+                                  { return handleAddImageFromPixels(req, context);   },
+      (RequestQueryFromPath req)  { return handleQueryFromPath(req, context);        },
+      (RequestFlushDb req)        { return handleFlushDb(req, context);              },
+      ()
       {
-        return handleAddImageFromPixels(req, context);
-      },
-      (RequestQueryFromPath req)
-      {
-        return handleQueryFromPath(req, context);
+        return Payload(ResponseFailure(ResponseFailure.Code.UnknownPayload));
       }
-      )();
+    )();
   }
   catch(DatabaseNotFoundException e) {
     response = ResponseFailure(ResponseFailure.Code.DbNotFound);
@@ -229,8 +216,8 @@ Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
     req.pixels_res.height,
     req.pixels);
 
-  writefln("Imported wand; image res: %dx%d",
-    wand.imageWidth(), wand.imageHeight());
+  writefln("Imported wand; original image res: %dx%d",
+    req.original_res.width, req.original_res.height);
 
   auto image_data = ImageSigDcRes.fromWand(wand);
   image_data.res = req.original_res;
@@ -273,4 +260,18 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
   //scope(exit) { GC.free(resp_results.ptr); }
 
   return Payload(ResponseQueryResults(resp_results));
+}
+
+Payload handleFlushDb(RequestFlushDb req, Context context)
+{
+  user_id_t db_id = req.db_id;
+  auto db = cast(PersistedDb) context.getDbEx(db_id);
+
+  if(db is null)
+  {
+    return Payload(ResponseUnpersistableDb(db_id));
+  }
+
+  db.flush();
+  return Payload(ResponseSuccess());
 }
