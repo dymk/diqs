@@ -38,12 +38,8 @@ class Context
 
     foreach(id, db; databases) {
       list ~= db.visit!(
-        (FileDb fdb) {
-          return DbInfo(id, fdb);
-        },
-        (MemDb mdb) {
-          return DbInfo(id, mdb);
-        }
+        (FileDb fdb) { return DbInfo(id, fdb); },
+        (MemDb  mdb) { return DbInfo(id, mdb); }
       )();
     }
 
@@ -51,15 +47,12 @@ class Context
   }
 
   bool fileDbIsLoaded(string path) {
-    foreach(db; databases.byValue) {
+    foreach(db; databases.byValue)
+    {
 
       bool found = db.visit!(
-        (FileDb fdb) {
-          return buildPath(fdb.path()) == buildPath(path);
-        },
-        (MemDb mdb) {
-          return false;
-        }
+        (FileDb fdb) { return buildPath(fdb.path()) == buildPath(path); },
+        (MemDb mdb)  { return false; }
       )();
 
       if(found)

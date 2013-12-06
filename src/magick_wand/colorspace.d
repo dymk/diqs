@@ -43,7 +43,8 @@ YIQ toYIQ(RGB c) {
 	return YIQ(cast(ubyte)y, cast(byte)i, cast(byte)q);
 }
 
-unittest {
+unittest
+{
 	auto rgb = RGB(255, 255, 255);
 	auto yiq = YIQ(255,   0,   0);
 	auto rgb_2_yiq = rgb.toYIQ();
@@ -51,7 +52,8 @@ unittest {
 }
 
 RGB toRGB(RGB c) { return c; }
-RGB toRGB(YIQ c) {
+RGB toRGB(YIQ c)
+{
 	/*
 	 * http://www.cs.rit.edu/~ncs/color/t_convert.html
 	 */
@@ -71,12 +73,14 @@ RGB toRGB(YIQ c) {
 	  (1.000 * y) -
 	  (1.105 * i) +
 	  (1.702 * q));
-	return RGB(cast(byte)r, cast(byte)g, cast(byte)b);
+	return RGB(cast(ubyte)r, cast(ubyte)g, cast(ubyte)b);
 }
 
-unittest {
+unittest
+{
 	auto rgb = RGB(255, 255, 255);
 	auto yiq = YIQ(255,   0,   0);
 	auto yiq_2_rgb = yiq.toRGB();
+
 	assert(yiq_2_rgb == rgb);
 }
