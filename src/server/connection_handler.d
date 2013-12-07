@@ -19,9 +19,13 @@ import std.stdio;
 import std.variant;
 import std.concurrency;
 import std.socket;
+import std.file;
+import std.parallelism : taskPool;
+import std.datetime : StopWatch;
 import std.getopt : getopt;
 import std.range : array;
 import core.time : dur;
+import core.atomic;
 
 void handleClientRequest(Socket conn, Context context)
 {
@@ -46,6 +50,7 @@ void handleClientRequest(Socket conn, Context context)
                                   { return handleAddImageFromPixels(req, context);   },
       (RequestQueryFromPath req)  { return handleQueryFromPath(req, context);        },
       (RequestFlushDb req)        { return handleFlushDb(req, context);              },
+      (RequestAddImageBatch req)  { return handleAddImageBatch(req, context, conn);  },
       ()
       {
         return Payload(ResponseFailure(ResponseFailure.Code.UnknownPayload));
@@ -245,6 +250,9 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
   qp.in_image = &input;
   qp.num_results = req.num_results;
 
+  // Start a timer to measure how long a query took to perform
+  StopWatch timer;
+  timer.start();
 
   auto query_results = db.query(qp);
   scope(exit) { GC.free(query_results.ptr); }
@@ -259,7 +267,10 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
   )().array();
   //scope(exit) { GC.free(resp_results.ptr); }
 
-  return Payload(ResponseQueryResults(resp_results));
+  timer.stop();
+  auto elapsedMsec = timer.peek().msecs;
+
+  return Payload(ResponseQueryResults(elapsedMsec, resp_results));
 }
 
 Payload handleFlushDb(RequestFlushDb req, Context context)
@@ -274,4 +285,72 @@ Payload handleFlushDb(RequestFlushDb req, Context context)
 
   db.flush();
   return Payload(ResponseSuccess());
+}
+
+Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket conn)
+{
+  user_id_t db_id = req.db_id;
+  auto db = context.getDbEx(db_id);
+  auto persistable_db = cast(PersistedDb) db;
+
+  auto image_entries = dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.depth);
+
+  int num_added = 0;
+  int num_failures = 0;
+  immutable flush_per_added = req.flush_per_added;
+
+  void batchFailure(string image_path, ResponseFailure.Code err_code)
+  {
+    conn.writePayload(
+      ResponseFailureBatch(db_id, image_path, err_code));
+    num_failures++;
+
+  }
+
+  foreach(image_path; taskPool.parallel(image_entries))
+  {
+    auto image_data = ImageSigDcRes.fromFile(image_path);
+    auto image_id = db.addImage(image_data, db.peekNextId);
+
+    with (ResponseFailure.Code)
+    synchronized
+    {
+      try
+      {
+        num_added++;
+        conn.writePayload(
+          ResponseImageAddedBatch(db_id, image_id, image_path));
+
+        if(
+          flush_per_added != 0 &&              // There is a flush interval
+          num_added % flush_per_added == 0 &&  // The flush interval has been hit
+          persistable_db !is null)             // The database has a flush() method
+        {
+          persistable_db.flush();
+        }
+      }
+      catch(magick_wand.wand.NonExistantFileException e) {
+        batchFailure(image_path, NonExistantFile);
+      }
+
+      catch(magick_wand.wand.InvalidImageException e) {
+        batchFailure(image_path, InvalidImage);
+      }
+
+      catch(magick_wand.wand.CantResizeImageException e) {
+        batchFailure(image_path, CantResizeImage);
+      }
+
+      catch(magick_wand.wand.CantExportPixelsException e) {
+        batchFailure(image_path, CantExportPixels);
+      }
+    }
+  }
+
+  if(persistable_db !is null)
+  {
+    persistable_db.flush();
+  }
+
+  return Payload(ResponseSuccessBatch(db_id, num_added, num_failures));
 }

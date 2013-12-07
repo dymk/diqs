@@ -234,8 +234,6 @@ int main(string[] args)
       cmd_parts = cmd_parts[1..$];
     }
 
-    writeln("CMD parts: ", cmd_parts);
-
     if(command == "help" || command == "") {
       printCommands();
     }
@@ -332,36 +330,57 @@ int main(string[] args)
 
     else if(command == "addImageBatch")
     {
-      if(cmd_parts.length != 2)
+      if(cmd_parts.length < 2 || cmd_parts.length > 3)
       {
-        writefln("addImageBatch takes 2 arguments");
+        writefln("addImageBatch takes 2 or 3 arguments");
         continue;
       }
 
       auto folder = cmd_parts[0];
       user_id_t db_id = to!user_id_t(cmd_parts[1]);
 
-      auto entries = dirEntries(folder, "*.{png,jpg,gif}", SpanMode.depth);
+      RequestAddImageBatch req;
+      req.folder = folder;
+      req.db_id = db_id;
 
-      foreach(image_path; entries)
+      if(cmd_parts.length == 3)
       {
-        // Add image to database; don't flush the database until the
-        // last step though
-        addImage(image_path, db_id, 0, false, false);
+        req.flush_per_added = to!int(cmd_parts[2]);
+      }
+      else
+      {
+        req.flush_per_added = 500;
+      }
+
+      conn.writePayload(req);
+
+      // Keep reading batch image adds/failures until we get a success
+      // message, or a fatal error.
+      bool keep_reading = true;
+      while(keep_reading)
+      {
         Payload resp = conn.readPayload();
         resp.tryVisit!(
-          (ResponseImageAdded r) {
-            writefln("s::%s::%d::%d", image_path, r.db_id, r.image_id);
+          (ResponseImageAddedBatch r)
+          {
+            writefln("s::%s::%d::%d", r.image_path, r.db_id, r.image_id);
+          },
+          (ResponseFailureBatch r)
+          {
+            writefln("f::%s::%d", r.image_path, r.code);
+          },
+          (ResponseSuccessBatch r)
+          {
+            writefln("Done, %d images added; %d failures", r.num_images_added, r.num_failures);
+            keep_reading = false;
           },
           (ResponseFailure r)
           {
-            writefln("f::%s::%d", image_path, r.code);
+            writefln("Fatal error during batch add: %d", r.code);
+            keep_reading = false;
           }
         )();
       }
-
-      // All images added; flush the database
-      flushDatabase(db_id);
     }
 
     else if(command == "flushDb")
@@ -396,6 +415,7 @@ int main(string[] args)
       conn.readPayload().tryVisit!(
         handleFailure,
         (ResponseQueryResults resp) {
+          writefln("Query took %d milliseconds to perform", resp.duration);
           foreach(result; resp.results)
           {
             writefln("ID: %8d | Sim: %2.2f | Res: %dx%d",

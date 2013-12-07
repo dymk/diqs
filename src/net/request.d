@@ -56,6 +56,16 @@ struct RequestAddImageFromPixels {
 	bool flush_db_after_add = true;
 }
 
+struct RequestAddImageBatch {
+	user_id_t db_id;
+
+	// Folder to add images from
+	string folder;
+
+	// Flush the database after each set of this number of images are added
+	int flush_per_added;
+}
+
 struct RequestRemoveImage {
 	user_id_t database_id;
 	user_id_t image_id;
