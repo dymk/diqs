@@ -58,6 +58,40 @@ struct ResponseFailure {
 	Code code;
 }
 
+struct ResponseImageAddedBatch {
+	// A struct that represents an image added in a batch operation
+	// There isn't a guaretnee what order the images will be added,
+	// so the path of the image is included along with the image's
+	// ID
+
+	user_id_t db_id;
+	user_id_t image_id;
+	string image_path;
+}
+
+struct ResponseFailureBatch {
+	// Similar idea as ResponseImageAddedBatch, so the path of the image can be
+	// associated with the failure code why it failed to be added to the db
+
+	user_id_t db_id;
+	string image_path;
+	ResponseFailure.Code code;
+}
+
+struct ResponseSuccessBatch {
+	// Sent after all of the images in a batch operation have been added
+	// to the database
+
+	user_id_t db_id;
+
+	// The number of images added to the database (images in the directory
+	// minus the number of failures)
+	int num_images_added;
+
+	// The number of failures
+	int num_failures;
+}
+
 struct ResponseUnpersistableDb {
 	user_id_t db_id;
 }
@@ -86,5 +120,9 @@ struct ResponseQueryResults {
 		ImageRes res;
 	}
 
+	// How long the query took to perform
+	long duration;
+
+	// Each individual query result
 	QueryResult[] results;
 }

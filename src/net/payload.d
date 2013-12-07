@@ -73,11 +73,15 @@ enum PayloadType : ushort {
 	response_image_added,
 	response_list_databases,
 	response_query_results,
+	response_success_batch,
+	response_failure_batch,
 	response_server_shutdown,
+	response_image_added_batch,
 	response_unpersistable_db,
 
 	request_add_image_from_pixels,
 	request_add_image_from_path,
+	request_add_image_batch,
 	request_server_shutdown,
 	request_query_from_path,
 	request_list_databases,
@@ -86,7 +90,7 @@ enum PayloadType : ushort {
 	request_remove_image,
 	request_flush_db,
 	request_version,
-	request_ping,
+	request_ping
 }
 
 string[] getPayloadTypesStrings()
