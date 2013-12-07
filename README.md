@@ -1,44 +1,57 @@
 DIQS - D Image Query Server
 ---------------------------
-By dymk - _tcdknutson@gmail.com_
 
-> **Note**: Right now, this is alpha level software. Expect sharp corners,
-a fire in the server room, and ants to crawl out of your keyboard.
+> **Note**: Right now, this is alpha level software, although it seems to work
+fairly reliably right now. Expect sharp corners, a fire in the server room, and
+ants to crawl out of your keyboard if you use this in production.
 
-_Many thanks to piespy, Xamayon, and dovac in #iqdb_
+DIQS is a set of tools for determining how visually similar images are. Its aim is to
+be both _high speed_, and have a _small memory footprint_. It currently
+consists of two components: A server, and a client binary. The server is
+responsible for the creation/loading/modification/querying of file backed
+databases on the disk. The client provides a command line interface for
+interacting with the server, over a network protocol described in `src/net/payload.d`.
+The server can have multiple databases open at once, as well as interact with
+multiple clients at a time.
 
-_Distributed under the terms and conditions of "I dunno, I'll figure
-it out later"._
+Images in a database are associated with an immutable ID, which
+is used for removing the image from the database, and to refer to it in query
+results. It's refered to as the 'user_id', as it is the user facing ID of the image.
+
+DIQS is my first experementation in writing medium sized, networked applications
+in D, so if you run into issues, please let me know in the [bug tracker](https://github.com/dymk/diqs/issues)!
 
 1: Configuration
 ----------------
 
-You'll need the ImageMagick dev package for your system. DIQS has been
-tested and ships with the export library files for `ImageMagick-6.8.6-Q16`.
+DIQS depends on ImageMagick dev package for your system, and has been tested with
+version `ImageMagick-6.8.6-Q16`.
 
-DIQS was tested with DMD version 2.063, and the `~master` of LDC. There's a good
-chance that it'll work just fine with GDC though. If you run into compiler
-errors, try chaning around the DC flags in the makefile; release and unittest
-tend to break the most often due to compiler changes.
+DIQS was tested with DMD version 2.064.2, and `~master` of LDC. There's a good
+chance that it'll work just fine with GDC though, and with 2.063 of DMD. If you
+run into compiler errors, try changing around the DC flags in the makefile;
+release and unittest tend to break the most often due to compiler changes. Chances
+are it'll compile and work just fine on Windows, but YMMV.
 
 2: Compilation
 --------------
 
 `make` to make, by default, the `debug` versions of the client/server
-`make <config>` to make a specific configurtion, where `config` is one of:
- * `debug`: Build with debug informatoin
- * `release`: Build release
- * `unittest`: Build (& run) the test runner
- * `unittest_diskio` Build (& run) the test runner, and also test functions that perform file I/O (which makes tests slower)
+ * `make debug`: Build with debug information
+ * `make release`: Build release
+ * `make unittest`: Build (& run) the test runner
+ * `make unittest_diskio`: Build (& run) the test runner, and also test functions that perform file I/O (which makes tests slower)
 
-If you get linker errors on posix, make sure that the `MagickCore` and
-`MagickWand` libraries are being linked (see `src/magick_wand/all.d`).
+If you get linker errors on POSIX, make sure that the `MagickCore` and
+`MagickWand` libraries are installed.
+
+To compile with another D compiler, tack on a `DC=ldmd2` or whatever might suit you.
 
 3: Running
 ----------
 
 You should now have a `server` and `client` binary. The `client` will
-connect to an active server on a given port, at which point one can perform
+connect to an active server on a given port, at which point the client can perform
 server administration such as adding or removing images, loading/unloading/flushing
 databases, or querying images. Running either binary with the `-h` flag will
 print the command line options that they take.
@@ -49,7 +62,8 @@ bind to (the default of which is 127.0.0.1). Multiple servers can run on
 on a single computer, and servers can have multiple databases loaded at
 one time.
 
-Databases on the server are referenced with an opaque database id (DBID or db_id in the code)
+Databases on the server are referenced with an opaque database id (DBID or db_id in the code),
+which changes depending on the order that databases are loaded by the server.
 
 Here's a list of supported client commands, as per the `help` command:
 
@@ -109,7 +123,7 @@ Format of Client Output
 =======================
 
 Client output is in a state of flux right now, and only batch image insertion
-into a database has an easily parsable output.
+into a database has an easily parse  output.
 
 ### addImageBatch
 On success:
@@ -125,18 +139,29 @@ failed.
 
 Todo
 ====
- - Create only in memory databases (lower overhead than file backed DBs)
- - Distribute file databases across multiple clients (parallelize lookup, or
-   allow clustering of slaves across several low power machines)
- - MySQL/PG persistance layer adapter
- - Loading bar for loading large databases (should be trivial)
- - Network protocol for running DIQS as an actual server
+  * Create only in memory databases (lower overhead than file backed DBs)
+  * Distribute file databases across multiple clients (parallelize lookup, or
+    allow clustering of slaves across several low power machines)
+  * MySQL/PG persistance layer adapter
+  * Loading bar for loading large databases (should be trivial)
+  * Network protocol for running DIQS as an actual server
 
 In OnDiskPersistance:
- - Break up database into multiple files, perhaps for parallelized
-loading from the disk?
+  * Break up database into multiple files, perhaps for parallelized
+    loading from the disk?
 
 Optimizations that need to happen (more than they already have):
- - Profile large database loading (Takes ~5 seconds to load a 100K image db).
- - Profile database querying
- - B&W Image Optimizations (less storage needed + faster query times)
+  * Profile large database loading (Takes ~5 seconds to load a 100K image db).
+  * Profile database querying
+  * B&W Image Optimizations (less storage needed + faster query times)
+  * Image querying isn't made multithreaded at all, but it's an
+    embarrassingly parallel problem to solve. Take 5 minutes to make the
+    foreach loop parallel in src/query.d
+
+
+_Many thanks to piespy, Xamayon, and dovac in #iqdb_
+
+_Distributed under the terms and conditions of "I dunno, I'll figure
+it out later"._
+
+_Authored by [dymk](https://www.github.com/dymk/) - tcdknutson@gmail.com_
