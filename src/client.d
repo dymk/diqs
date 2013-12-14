@@ -216,14 +216,20 @@ int main(string[] args)
 
   while(conn.isAlive()) {
     write("Select action (help): ");
-    auto cmd_string = readln();
-    if(cmd_string) {
-      cmd_string = cmd_string.chomp().strip();
-    } else {
-      cmd_string = "";
+    char[] buffer;
+    auto len = readln(buffer);
+
+    if(len == 0) {
+      break;
     }
 
-    scope scope_cmd_parts = cmd_string.split();
+    if(buffer) {
+      buffer = buffer.chomp.strip;
+    } else {
+      buffer = "".dup;
+    }
+
+    scope scope_cmd_parts = buffer.idup.split();
     string[] cmd_parts = scope_cmd_parts;
 
     string command;

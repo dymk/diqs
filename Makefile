@@ -166,13 +166,13 @@ $(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
 $(DIQS_OBJ):        $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
-$(MSGPACK_OBJ):     $(MSGPACK_FILES) git_submodules
+$(MSGPACK_OBJ):     git_submodules $(MSGPACK_FILES)
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)
 
 $(MAGICKWAND_OBJ):  $(MAGICKWAND_FILES)
 	$(DC) $(DC_FLAGS) $(MAGICKWAND_FILES) -c -of$(MAGICKWAND_OBJ)
 
-$(LEVELDB_OBJ):     $(LEVELDB_FILES) git_submodules
+$(LEVELDB_OBJ):     git_submodules $(LEVELDB_FILES)
 	$(DC) $(DC_FLAGS) $(LEVELDB_FILES) $(D_LEVELDB_FILES) -c -of$(LEVELDB_OBJ)
 
 .PHONY: git_submodules
