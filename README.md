@@ -1,5 +1,5 @@
 DIQS - D Image Query Server
----------------------------
+===========================
 
 > **Note**: Right now, this is alpha level software, although it seems to work
 fairly reliably right now. Expect sharp corners, a fire in the server room, and
@@ -74,12 +74,12 @@ Here's a list of supported client commands, as per the `help` command:
   lsDbs
     List the databases available on the server
 
-  loadFileDb PATH [CREATE_IF_NOT_EXIST]
+  loadLevelDb PATH [CREATE_IF_NOT_EXIST]
     Loads a file database on the server at PATH. Fails if the database
     does not exist. If CREATE_IF_NOT_EXIST is 1, then the database is
     created if it doesn't exist.
 
-  createFileDb PATH
+  createLevelDb PATH
     Creates and loads new file database on the server at PATH.
     Fails if the database already exists.
 
@@ -100,9 +100,11 @@ Here's a list of supported client commands, as per the `help` command:
   flushDb DBID
     Flushes a database to whatever medium it's persisted on
 
-  addImageBatch PATH DBID
+  addImageBatch PATH DBID [FLUSH_PER=500]
     Adds a set of images to the database, where PATH is the path
-    to a folder of images.
+    to a folder of images. The database is flushed (if it supports that)
+    every FLUSH_PER images added (by default, the DB is flushed every 500
+    images added).
 
   queryImage PATH DBID [NUM_RESULTS = 10]
     Perform a similarity query, listing the top NUM_RESULTS matches.
@@ -119,11 +121,19 @@ now in the database.
 Results are in the format `ID: <id> : <similarity>%`, where similarity
 is a percent.
 
-Format of Client Output
-=======================
+The Temporary Format of Client Output
+-------------------------------------
 
 Client output is in a state of flux right now, and only batch image insertion
-into a database has an easily parse  output.
+and querying has a semi-easy parseable output.
+
+Because there isn't a dedicated tool for inserting images yet, I recommend
+adding images using a command like this to capture the mapping of
+image paths to IDs:
+
+```
+echo "addImageBatch <image_directory> <db_id>" | ./client > id_map_file
+```
 
 ### addImageBatch
 On success:
@@ -137,27 +147,35 @@ that did (or tried to) insert the image, `image_id` is the ID of the image after
 insertion, and `code` is the error code returned by the server if the insertion
 failed.
 
+### queryImage
+On success:
+  `ID:   <id> | Sim: <sim> | Res: <res>` where `<id>` is the image's `user_id`,
+  `<sim>` is a floating point percentage visual similarity, and `res` is the
+  resulution of the image in `widthXheight` format.
+  Sample: `ID:   484146 | Sim: 53.19 | Res: 64x64`
+
+On failure:
+  `Failure | <error>` where `<error>` is the error that prevented the query from
+  completing.
+  Sample: `Failure | NonExistantFile`
+
 Todo
-====
+----
   * Create only in memory databases (lower overhead than file backed DBs)
   * Distribute file databases across multiple clients (parallelize lookup, or
     allow clustering of slaves across several low power machines)
-  * MySQL/PG persistance layer adapter
+  * ~~MySQL/PG persistance layer adapter~~ _LevelDb backed store implemented_
   * Loading bar for loading large databases (should be trivial)
-  * Network protocol for running DIQS as an actual server
+  * ~~Network protocol for running DIQS as an actual server~~ _Basic multiclient server and client implemented_
 
 In OnDiskPersistance:
   * Break up database into multiple files, perhaps for parallelized
     loading from the disk?
 
 Optimizations that need to happen (more than they already have):
-  * Profile large database loading (Takes ~5 seconds to load a 100K image db).
-  * Profile database querying
+  * Store bucket sizes in LevelDb.
+  * Profile database querying (mostly needs to be made multithreaded)
   * B&W Image Optimizations (less storage needed + faster query times)
-  * Image querying isn't made multithreaded at all, but it's an
-    embarrassingly parallel problem to solve. Take 5 minutes to make the
-    foreach loop parallel in src/query.d
-
 
 _Many thanks to piespy, Xamayon, and dovac in #iqdb_
 
