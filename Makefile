@@ -33,6 +33,9 @@ else
   DEBUG_FLAGS           += -debug -gc
 endif
 
+# Ensure submodules are cloned
+GIT_SUBMODULE_UPDATE = $(shell git submodule update --init)
+
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
@@ -124,7 +127,7 @@ release: $(ALL_BIN)
 
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
-unittest: $(TEST_RUNNER_BIN) $(SERVER_BIN) $(CLIENT_BIN)
+unittest: $(ALL_BIN) $(TEST_RUNNER_BIN)
 	./$(TEST_RUNNER_BIN)
 
 .PHONY: unittest_diskio
@@ -166,18 +169,14 @@ $(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
 $(DIQS_OBJ):        $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
-$(MSGPACK_OBJ):     git_submodules $(MSGPACK_FILES)
+$(MSGPACK_OBJ):     $(MSGPACK_FILES)
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)
 
 $(MAGICKWAND_OBJ):  $(MAGICKWAND_FILES)
 	$(DC) $(DC_FLAGS) $(MAGICKWAND_FILES) -c -of$(MAGICKWAND_OBJ)
 
-$(LEVELDB_OBJ):     git_submodules $(LEVELDB_FILES)
+$(LEVELDB_OBJ):     $(LEVELDB_FILES)
 	$(DC) $(DC_FLAGS) $(LEVELDB_FILES) $(D_LEVELDB_FILES) -c -of$(LEVELDB_OBJ)
-
-.PHONY: git_submodules
-git_submodules:
-	git submodule update --init
 
 .PHONY: clean
 clean:
