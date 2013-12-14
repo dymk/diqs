@@ -9,6 +9,16 @@ import std.range : isInputRange;
 
 interface PersistedDb : BaseDb
 {
+	static class PersistedDbException : BaseDbException {
+	  this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+	  { super(message, file, line, next); }
+	};
+
+	static final class DbNonexistantException : PersistedDbException {
+	  this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+	  { super(message, file, line, next); }
+	};
+
 	// Releases the underlying MemDb. Invalidates the database from.
 	MemDb releaseMemDb();
 
@@ -22,11 +32,16 @@ interface PersistedDb : BaseDb
 	// Returns true if there is data waiting to be flushed to the persistence
 	// media.
 	bool dirty();
-	bool clean(); // !dirty()
 
 	// Is the database closed?
 	bool closed();
-	bool opened(); // !closed()
+
+	// Close the database
+	void close();
+
+	// The path (or another unique string) representing the location of the
+	// database
+	string path() const;
 
 	// A forward range to iterate over all the
 	// images in the database.
