@@ -71,10 +71,10 @@ int main(string[] args)
   static printDbInfo(DbInfo db_info) {
     final switch(db_info.type) with(DbInfo.Type) {
       case Mem:
-        writefln("MemDb:  | ID: %5d | Images: %5d", db_info.id, db_info.num_images);
+        writefln("MemDb:       | ID: %5d | Images: %5d", db_info.id, db_info.num_images);
         break;
-      case File:
-        writefln("FileDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
+      case Persisted:
+        writefln("PersistedDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
         break;
     }
   }
@@ -170,8 +170,8 @@ int main(string[] args)
     conn.writePayload(req);
   }
 
-  void genericLoadCreateFileDb(Req)(Req req)
-  if(is(Req == RequestCreateFileDb) || is(Req == RequestLoadFileDb))
+  void genericLoadCreateLevelDb(Req)(Req req)
+  if(is(Req == RequestCreateLevelDb) || is(Req == RequestLoadLevelDb))
   {
     conn.writePayload(req);
     conn.readPayload().tryVisit!(
@@ -243,21 +243,21 @@ int main(string[] args)
       listRemoteDbs();
     }
 
-    else if(command == "createFileDb")
+    else if(command == "createLevelDb")
     {
       if(cmd_parts.length != 1) {
-        writeln("createFileDb requires 1 argument");
+        writeln("createLevelDb requires 1 argument");
         continue;
       }
 
       string db_path = cmd_parts[0];
-      genericLoadCreateFileDb(RequestCreateFileDb(db_path));
+      genericLoadCreateLevelDb(RequestCreateLevelDb(db_path));
     }
 
-    else if(command == "loadFileDb")
+    else if(command == "loadLevelDb")
     {
       if(cmd_parts.length < 1 || cmd_parts.length > 2) {
-        writeln("loadFileDb requires 1 or 2 argument");
+        writeln("loadLevelDb requires 1 or 2 argument");
         continue;
       }
 
@@ -267,7 +267,7 @@ int main(string[] args)
       if(cmd_parts.length == 2)
         create_if_not_exist = true;
 
-      genericLoadCreateFileDb(RequestLoadFileDb(db_path, create_if_not_exist));
+      genericLoadCreateLevelDb(RequestLoadLevelDb(db_path, create_if_not_exist));
     }
 
     else if(command == "addImage")
@@ -455,12 +455,12 @@ void printCommands() {
   lsDbs
     List the databases available on the server
 
-  loadFileDb PATH [CREATE_IF_NOT_EXIST]
+  loadLevelDb PATH [CREATE_IF_NOT_EXIST]
     Loads a file database on the server at PATH. Fails if the database
     does not exist. If CREATE_IF_NOT_EXIST is 1, then the database is
     created if it doesn't exist.
 
-  createFileDb PATH
+  createLevelDb PATH
     Creates and loads new file database on the server at PATH.
     Fails if the database already exists.
 
@@ -481,9 +481,11 @@ void printCommands() {
   flushDb DBID
     Flushes a database to whatever medium it's persisted on
 
-  addImageBatch PATH DBID
+  addImageBatch PATH DBID [FLUSH_PER=500]
     Adds a set of images to the database, where PATH is the path
-    to a folder of images.
+    to a folder of images. The database is flushed (if it supports that)
+    every FLUSH_PER images added (by default, the DB is flushed every 500
+    images added).
 
   queryImage PATH DBID [NUM_RESULTS = 10]
     Perform a similarity query, listing the top NUM_RESULTS matches.

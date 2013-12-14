@@ -7,7 +7,7 @@ import query;
 import net.payload;
 import net.common;
 import magick_wand.wand;
-import image_db.file_db;
+import image_db.level_db;
 import image_db.mem_db;
 import image_db.persisted_db;
 import image_db.base_db;
@@ -42,8 +42,8 @@ void handleClientRequest(Socket conn, Context context)
       handleRequestVersion,
       (RequestServerShutdown req) { return handleRequestShutdown(req, context);      },
       (RequestListDatabases req)  { return handleRequestListDatabases(req, context); },
-      (RequestLoadFileDb req)     { return handleOpeningFileDatabase(req, context);  },
-      (RequestCreateFileDb req)   { return handleOpeningFileDatabase(req, context);  },
+      (RequestLoadLevelDb req)     { return handleOpeningLevelDatabase(req, context);  },
+      (RequestCreateLevelDb req)   { return handleOpeningLevelDatabase(req, context);  },
       (RequestAddImageFromPath req)
                                   { return handleAddImageFromPath(req, context);     },
       (RequestAddImageFromPixels req)
@@ -57,8 +57,12 @@ void handleClientRequest(Socket conn, Context context)
       }
     )();
   }
-  catch(DatabaseNotFoundException e) {
-    response = ResponseFailure(ResponseFailure.Code.DbNotFound);
+  catch(PersistedDb.DbNonexistantException e) {
+    response = ResponseFailure(ResponseFailure.Code.DbNonexistant);
+  }
+
+  catch(Context.DbNotLoadedException e) {
+    response = ResponseFailure(ResponseFailure.Code.DbNotLoaded);
   }
 
   catch(magick_wand.wand.NonExistantFileException e) {
@@ -77,12 +81,9 @@ void handleClientRequest(Socket conn, Context context)
     response = ResponseFailure(ResponseFailure.Code.CantExportPixels);
   }
 
-  catch(FileDb.DbFileAlreadyExistsException e) {
-    response = ResponseFailure(ResponseFailure.Code.DbFileAlreadyExists);
-  }
-
-  catch(FileDb.DbFileNotFoundException e) {
-    response = ResponseFailure(ResponseFailure.Code.DbFileNotFound);
+  catch(PayloadSocketClosedException e) {
+    writefln("Client closed the connection");
+    return;
   }
 
   catch(Exception e) {
@@ -119,33 +120,33 @@ Payload handleRequestListDatabases(RequestListDatabases req, Context context)
   return Payload(ResponseListDatabases(list));
 }
 
-Payload handleOpeningFileDatabase(R)(R req, Context context)
+Payload handleOpeningLevelDatabase(R)(R req, Context context)
 {
 
   writefln("Got load/create request for DB at '%s'", req.db_path);
 
-  FileDb db;
+  LevelDb db;
 
-  static if(is(R == RequestCreateFileDb))
+  static if(is(R == RequestCreateLevelDb))
   {
-    db = FileDb.createFromFile(req.db_path);
-    writefln("Created database at path %s", req.db_path);
+    writefln("Creating database at path %s", req.db_path);
+    bool create_if_not_exist = true;
   }
-  else static if(is(R == RequestLoadFileDb))
+  else static if(is(R == RequestLoadLevelDb))
   {
-    if(context.fileDbIsLoaded(req.db_path))
-    {
-      return Payload(ResponseFailure(ResponseFailure.Code.DbAlreadyLoaded));
-    }
-
-    db = FileDb.loadFromFile(req.db_path, req.create_if_not_exist);
-    writefln("Loaded database at path %s", req.db_path);
+    writefln("Loading database at path %s", req.db_path);
+    bool create_if_not_exist = req.create_if_not_exist;
   }
   else
-    static assert(false, "Request type must be LoadFileDb or CreateFileDb");
+    static assert(false, "Request type must be LoadLevelDb or CreateLevelDb");
 
+  if(context.persistedDbIsLoaded(req.db_path))
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.DbAlreadyLoaded));
+  }
+  db = new LevelDb(req.db_path, create_if_not_exist);
 
-  auto db_id = context.addDb(DbType(db));
+  auto db_id = context.addDb(DbType(cast(PersistedDb) db));
   return Payload(ResponseDbInfo(db_id, db));
 }
 
@@ -168,7 +169,7 @@ if(
 
   try
   {
-    bdb.addImage(image_data, image_id);
+    bdb.addImage(ImageIdSigDcRes.fromSigDcRes(image_data, image_id));
   }
   catch(BaseDb.AlreadyHaveIdException)
   {
@@ -293,63 +294,61 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
   auto db = context.getDbEx(db_id);
   auto persistable_db = cast(PersistedDb) db;
 
+  scope(exit)
+  {
+    if(persistable_db !is null)
+    {
+      persistable_db.flush();
+    }
+  }
+
   auto image_entries = dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.depth);
 
-  int num_added = 0;
-  int num_failures = 0;
+  shared int num_added = 0;
+  shared int num_failures = 0;
   immutable flush_per_added = req.flush_per_added;
 
   void batchFailure(string image_path, ResponseFailure.Code err_code)
   {
-    conn.writePayload(
-      ResponseFailureBatch(db_id, image_path, err_code));
-    num_failures++;
+    synchronized(conn)
+    {
+      conn.writePayload(ResponseFailureBatch(db_id, image_path, err_code));
+    }
+    atomicOp!"+="(num_failures, 1);
 
   }
 
   foreach(image_path; taskPool.parallel(image_entries))
   {
     auto image_data = ImageSigDcRes.fromFile(image_path);
-    auto image_id = db.addImage(image_data, db.peekNextId);
 
     with (ResponseFailure.Code)
-    synchronized
+    try
     {
-      try
+      user_id_t image_id = db.addImage(image_data);
+
+      atomicOp!"+="(num_added, 1);
+      synchronized(conn)
       {
-        num_added++;
-        conn.writePayload(
-          ResponseImageAddedBatch(db_id, image_id, image_path));
-
-        if(
-          flush_per_added != 0 &&              // There is a flush interval
-          num_added % flush_per_added == 0 &&  // The flush interval has been hit
-          persistable_db !is null)             // The database has a flush() method
-        {
-          persistable_db.flush();
-        }
-      }
-      catch(magick_wand.wand.NonExistantFileException e) {
-        batchFailure(image_path, NonExistantFile);
+        conn.writePayload(ResponseImageAddedBatch(db_id, image_id, image_path));
       }
 
-      catch(magick_wand.wand.InvalidImageException e) {
-        batchFailure(image_path, InvalidImage);
-      }
-
-      catch(magick_wand.wand.CantResizeImageException e) {
-        batchFailure(image_path, CantResizeImage);
-      }
-
-      catch(magick_wand.wand.CantExportPixelsException e) {
-        batchFailure(image_path, CantExportPixels);
-      }
     }
-  }
+    catch(magick_wand.wand.NonExistantFileException e) {
+      batchFailure(image_path, NonExistantFile);
+    }
 
-  if(persistable_db !is null)
-  {
-    persistable_db.flush();
+    catch(magick_wand.wand.InvalidImageException e) {
+      batchFailure(image_path, InvalidImage);
+    }
+
+    catch(magick_wand.wand.CantResizeImageException e) {
+      batchFailure(image_path, CantResizeImage);
+    }
+
+    catch(magick_wand.wand.CantExportPixelsException e) {
+      batchFailure(image_path, CantExportPixels);
+    }
   }
 
   return Payload(ResponseSuccessBatch(db_id, num_added, num_failures));

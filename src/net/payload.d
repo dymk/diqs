@@ -85,8 +85,8 @@ enum PayloadType : ushort {
 	request_server_shutdown,
 	request_query_from_path,
 	request_list_databases,
-	request_create_file_db,
-	request_load_file_db,
+	request_create_level_db,
+	request_load_level_db,
 	request_remove_image,
 	request_flush_db,
 	request_version,
@@ -118,6 +118,12 @@ class PayloadException : Exception {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 };
 final class InvalidPayloadException : PayloadException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class PayloadSocketExecption : PayloadException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class PayloadSocketClosedException : PayloadException {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 };
 
@@ -257,12 +263,24 @@ void writePayload(P)(Socket conn, P payload)
 			while(sent_pos < length)
 			{
 				auto bytes_sent = conn.send(packed[sent_pos .. $]);
-				enforce(bytes_sent != Socket.ERROR, conn.getErrorText());
+				if(bytes_sent == Socket.ERROR)
+				{
+					if(conn.isAlive())
+					{
+						auto err_text = conn.getErrorText();
+						conn.close();
+						throw new PayloadSocketExecption(err_text);
+					}
+					else
+					{
+						throw new PayloadSocketClosedException("connection was closed");
+					}
+				}
 				sent_pos += bytes_sent;
 			}
 
-			import std.string : format;
-			assert(sent_pos == length, format("sent: %d, actual: %d", sent_pos, length));
+			enforceEx!PayloadSocketExecption(sent_pos == length,
+				format("sent: %d, actual: %d", sent_pos, length));
 		}
 
 	}

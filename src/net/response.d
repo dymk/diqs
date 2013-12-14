@@ -3,7 +3,7 @@ module net.response;
 import sig;
 import types;
 import image_db.mem_db : MemDb;
-import image_db.file_db : FileDb;
+import image_db.persisted_db : PersistedDb;
 import net.db_info : DbInfo;
 import net.common;
 
@@ -12,7 +12,7 @@ struct ResponseDbInfo {
 		this.db = DbInfo(id, _db);
 	}
 
-	this(user_id_t id, FileDb _db) {
+	this(user_id_t id, PersistedDb _db) {
 		this.db = DbInfo(id, _db);
 	}
 
@@ -33,7 +33,8 @@ struct ResponseFailure {
 
 		// Loaded database errors
 		DbAlreadyLoaded,
-		DbNotFound,
+		DbNotLoaded,
+		DbNonexistant,
 
 		// Image signature generation errors
 		NonExistantFile,
@@ -41,7 +42,7 @@ struct ResponseFailure {
 		CantResizeImage,
 		CantExportPixels,
 
-		// FileDb file exceptions
+		// PersistedDb file exceptions
 		DbFileAlreadyExists,
 		DbFileNotFound,
 

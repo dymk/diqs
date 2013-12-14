@@ -4,11 +4,11 @@ import sig : ImageRes;
 import types;
 import magick_wand.colorspace : RGB;
 
-struct RequestCreateFileDb {
+struct RequestCreateLevelDb {
 	string db_path;
 }
 
-struct RequestLoadFileDb {
+struct RequestLoadLevelDb {
 	string db_path;
 	bool create_if_not_exist = false;
 }
