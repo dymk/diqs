@@ -5,30 +5,30 @@ import std.path;
 import std.exception;
 
 import image_db.mem_db;
-import image_db.file_db;
-import image_db.base_db;
+import image_db.persisted_db;
 
 import net.db_info;
 
-class ContextException : Exception
-{
-  this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-};
-
-final class DatabaseNotFoundException : ContextException
-{
-  this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-};
 
 alias DbType = Algebraic!(
-  FileDb,
+  PersistedDb,
   MemDb);
 
 class Context
 {
+  static class ContextException : Exception
+  {
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+  };
+
+  final static class DbNotLoadedException : ContextException
+  {
+    this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+  };
+
   this()
   {
-    db_id_gen = new IdGen!user_id_t();
+    db_id_gen = new shared IdGen!user_id_t();
   }
 
   DbInfo[] listDbInfo()
@@ -38,7 +38,7 @@ class Context
 
     foreach(id, db; databases) {
       list ~= db.visit!(
-        (FileDb fdb) { return DbInfo(id, fdb); },
+        (PersistedDb fdb) { return DbInfo(id, fdb); },
         (MemDb  mdb) { return DbInfo(id, mdb); }
       )();
     }
@@ -46,13 +46,13 @@ class Context
     return list;
   }
 
-  bool fileDbIsLoaded(string path) {
+  bool persistedDbIsLoaded(string path) {
     foreach(db; databases.byValue)
     {
 
       bool found = db.visit!(
-        (FileDb fdb) { return buildPath(fdb.path()) == buildPath(path); },
-        (MemDb mdb)  { return false; }
+        (PersistedDb fdb) { return fdb.path() == path; },
+        (MemDb       mdb) { return false; }
       )();
 
       if(found)
@@ -64,11 +64,11 @@ class Context
 
   BaseDb getDbEx(user_id_t db_id)
   {
-    DbType db = *enforceEx!DatabaseNotFoundException(db_id in databases, "Database isn't loaded");
+    DbType db = *enforceEx!DbNotLoadedException(db_id in databases, "Database isn't loaded");
 
     return db.visit!(
-      (FileDb fdb) { return cast(BaseDb)fdb; },
-      (MemDb mdb)  { return cast(BaseDb)mdb; }
+      (PersistedDb fdb) { return cast(BaseDb)fdb; },
+      (MemDb       mdb) { return cast(BaseDb)mdb; }
     )();
   }
 
@@ -88,5 +88,5 @@ class Context
 
 private:
   DbType[user_id_t] databases;
-  IdGen!user_id_t db_id_gen;
+  shared IdGen!user_id_t db_id_gen;
 }

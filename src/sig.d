@@ -201,6 +201,10 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
+	static ImageIdSigDcRes fromSigDcRes(in ImageSigDcRes img, user_id_t user_id)
+	{
+		return ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+	}
 }
 
 version(unittest) {

@@ -10,7 +10,6 @@ import net.common;
 import server.connection_handler;
 import server.context;
 
-import image_db.file_db : FileDb;
 import image_db.base_db : BaseDb, IdGen;
 
 import magick_wand.wand;
@@ -129,7 +128,8 @@ int main(string[] args)
     listener_set.add(listener);
     foreach(conn; client_connections)
     {
-      listener_set.add(conn);
+      if(conn.isAlive())
+        listener_set.add(conn);
     }
 
     auto select_ret = Socket.select(listener_set, null, null);

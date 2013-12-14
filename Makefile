@@ -21,13 +21,19 @@ endif
 # Adding the -release flag on DMD causes linker errors for some reason
 # (even with -allinst)
 ifeq (dmd,$(DC))
-  RELEASE_FLAGS         += -O -noboundscheck -inline
+  RELEASE_FLAGS         += -O -noboundscheck -inline -release
 else
   RELEASE_FLAGS         += -O -release -noboundscheck -inline
 endif
 
+# ldmd2 has a bug when including debug symbols in (AT&T asm printer)
+ifeq (ldmd2,$(DC))
+  DEBUG_FLAGS           += -debug
+else
+  DEBUG_FLAGS           += -debug -gc
+endif
+
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
-DEBUG_FLAGS           += -debug -gc
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
@@ -54,9 +60,8 @@ DIQS_FILES := \
   src/image_db/bucket_manager.d \
   src/image_db/mem_db.d \
   src/image_db/base_db.d \
+  src/image_db/level_db.d \
   src/image_db/persisted_db.d \
-  src/image_db/file_db_unittests.d \
-  src/image_db/file_db.d \
   src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \
@@ -77,21 +82,30 @@ MSGPACK_FILES := $(MSGPACK_DIR)/msgpack.d
 PAYLOAD_FILES := $(shell ls src/net/*.d)
 PAYLOAD_OBJ   := payload$(OBJ_EXT)
 
+# D_LEVELDB_DIR   := vendor/d-leveldb
+# D_LEVELDB_FILES := $(shell ls -r $(D_LEVELDB_DIR)/etc/**/*.d)
+
+LEVELDB_DIR     := vendor/leveldb
+LEVELDB_FILES   := $(shell ls -r $(LEVELDB_DIR)/deimos/**/*.d)
+
+LEVELDB_OBJ     := leveldb$(OBJ_EXT)
+
 ifneq ($(OS),Windows_NT)
-  LIB_STRING := $(shell pkg-config --libs MagickWand)
+  LIB_STRING := $(shell pkg-config --libs MagickWand) -lleveldb
 
   # Preprend -L onto each linker flag (required by (l)dmd)
   LIBS = $(foreach lib,$(LIB_STRING),-L$(lib))
 
   # Ends up looking like this:
-  # LIBS := -L-L/opt/local/lib -L-levent -L-levent_pthreads -L-lssl -L-lcrypto -L-lMagickWand -L-lMagickCore
+  # LIBS := -L-L/opt/local/lib -L-lleveldb -L-lMagickWand -L-lMagickCore
 endif
 # ====================================================================
 
 # COMMON_OBJS = $(MAGICKWAND_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
-COMMON_OBJS = $(MAGICKWAND_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
+COMMON_OBJS = $(MAGICKWAND_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(LEVELDB_OBJ)
+ALL_OBJS    = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJS)
 
-INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR)
+INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LEVELDB_DIR)
 
 DC_FLAGS += $(INCLUDE_DIRS)
 
@@ -126,16 +140,16 @@ speedtest: $(TEST_RUNNER_BIN)
 $(SERVER_BIN):      $(SERVER_OBJ) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(SERVER_BIN)
 
-$(SERVER_OBJ):          $(SERVER_FILES)
-	$(DC) $(INCLUDE_DIRS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
+$(SERVER_OBJ):      $(SERVER_FILES)
+	$(DC) $(DC_FLAGS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
 # ==============================================================================
 
 # ==============================================================================
 $(CLIENT_BIN):      $(CLIENT_OBJ) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
 
-$(CLIENT_OBJ):          $(CLIENT_FILES)
-	$(DC) $(INCLUDE_DIRS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
+$(CLIENT_OBJ):      $(CLIENT_FILES)
+	$(DC) $(DC_FLAGS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
 # ==============================================================================
 
 # ==============================================================================
@@ -146,18 +160,24 @@ $(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 
-
 $(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
 	$(DC) $(DC_FLAGS) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
 
 $(DIQS_OBJ):        $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
-$(MSGPACK_OBJ):     $(MSGPACK_FILES)
+$(MSGPACK_OBJ):     $(MSGPACK_FILES) git_submodules
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)
 
 $(MAGICKWAND_OBJ):  $(MAGICKWAND_FILES)
 	$(DC) $(DC_FLAGS) $(MAGICKWAND_FILES) -c -of$(MAGICKWAND_OBJ)
+
+$(LEVELDB_OBJ):     $(LEVELDB_FILES) git_submodules
+	$(DC) $(DC_FLAGS) $(LEVELDB_FILES) $(D_LEVELDB_FILES) -c -of$(LEVELDB_OBJ)
+
+.PHONY: git_submodules
+git_submodules:
+	git submodule update --init
 
 .PHONY: clean
 clean:
@@ -165,6 +185,5 @@ clean:
 	rm -f $(SERVER_BIN)
 	rm -f $(CLIENT_BIN)
 	rm -rf bin/*.*
-	rm -rf *.obj
-	rm -rf *.o
+	rm -f $(ALL_OBJS)
 	rm -rf *.exe

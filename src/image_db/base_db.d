@@ -21,11 +21,13 @@ interface BaseDb
 	};
 	static final class IdNotFoundException : BaseDbException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " not found in the database", file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+		{ super("Image with ID " ~ to!string(id) ~ " not found in the database", file, line, next); }
 	};
 	static final class AlreadyHaveIdException : BaseDbException {
 		this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
-		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super("Image with ID " ~ to!string(id) ~ " is already in the database", file, line, next); }
+		this(user_id_t id, string file = __FILE__, size_t line = __LINE__, Throwable next = null)
+		{ super("Image with ID " ~ to!string(id) ~ " is already in the database", file, line, next); }
 	};
 
 	/**
@@ -35,20 +37,12 @@ interface BaseDb
 	 */
 	user_id_t addImage(in ImageIdSigDcRes);
 
-	final user_id_t addImage(in ImageSigDcRes img, user_id_t user_id) {
-		ImageIdSigDcRes id_img = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
-		return addImage(id_img);
-	}
-
 	/**
-	 * This version does the same as the previous, but the database
-	 * implementation will decide on the user_id to assign to the
-	 * image.
-	 *
-	 * Not implemented yet, because I'm not sure if I want to delegate
-	 * selection to outside of the database implementations.
+	 * Inserts an image without a yet determind ID into the database
+	 * and returns its assigned ID. The database will determine what
+	 * ID to give the image.
 	 */
-	//user_id_t addImage(in ImageSigDcRes);
+	user_id_t addImage(in ImageSigDcRes);
 
 	/**
 	 * Removes an image with a given user ID from the database, returning
@@ -77,15 +71,15 @@ interface BaseDb
 // Guarenteed to never return the same number twice.
 final class IdGen(T)
 {
-	void saw(T id) {
+	synchronized void saw(T id) {
 		last_id = max(last_id, id+1);
 	}
 
-	T next() {
+	synchronized T next() {
 		return last_id++;
 	}
 
-	T peek() {
+	synchronized T peek() {
 		return last_id;
 	}
 
@@ -94,27 +88,27 @@ private:
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	assert(id.next() == 0);
 	assert(id.next() == 1);
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	assert(id.next() == 0);
 	id.saw(7);
 	assert(id.next() == 8);
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	assert(id.next() == 0);
 	id.saw(0);
 	assert(id.next() == 1);
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	id.next();
 	id.next();
 	id.next();
@@ -124,14 +118,14 @@ unittest {
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	id.saw(10);
 	assert(id.next() == 11);
 	assert(id.next() == 12);
 }
 
 unittest {
-	scope id = new IdGen!uint();
+	scope id = new shared IdGen!uint();
 	assert(id.peek() == 0);
 	assert(id.peek() == 0);
 	assert(id.peek() == 0);
