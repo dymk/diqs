@@ -28,7 +28,7 @@ import core.sync.mutex : Mutex;
 enum VersionMajor = 0;
 enum VersionMinor = 1;
 enum VersionPatch = 0;
-enum ServerVersion = ResponseVersion(VersionMajor, VersionMajor, VersionPatch);
+enum ServerVersion = ResponseVersion(VersionMajor, VersionMinor, VersionPatch);
 
 private {
   // Is the server running? (So connections know when to shut down)
