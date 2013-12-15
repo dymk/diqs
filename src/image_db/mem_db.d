@@ -18,13 +18,21 @@ import sig :
   ImageSig,
   ImageRes,
   ImageDc;
+
 import query :
+  QueryResult,
   QueryParams;
 
+import std.stdio;
 import std.algorithm : min, max;
 import std.exception : enforce;
+import core.sync.mutex;
 
-class MemDb : BaseDb
+version(unittest) {
+	import sig : sameAs;
+}
+
+final class MemDb : BaseDb
 {
 	alias StoredImage = ImageIdDcRes;
 
@@ -32,7 +40,8 @@ class MemDb : BaseDb
 	this()
 	{
 		m_manager = new BucketManager();
-		m_id_gen = new IdGen!user_id_t();
+		m_id_gen = new shared IdGen!user_id_t();
+		id_mutex = new Mutex;
 	}
 
 	this(size_t size_hint)
@@ -46,8 +55,11 @@ class MemDb : BaseDb
 	 * If it does, return a pointer to the image's information,
 	 * else, return null.
 	 */
-	const StoredImage* has(user_id_t id)
+	const(StoredImage)* has(user_id_t id)
 	{
+		id_mutex.lock();
+		scope(exit) { id_mutex.unlock(); }
+
 		const intern_id = id in id_intern_map;
 		if(intern_id is null)
 		{
@@ -78,33 +90,47 @@ class MemDb : BaseDb
 	 */
 
 	user_id_t addImage(in ImageIdSigDcRes img)
+	body
 	{
 		user_id_t user_id = img.user_id;
+
 		m_id_gen.saw(user_id);
 
-		synchronized
+		id_mutex.lock();
+		scope(exit) { id_mutex.unlock(); }
+
+		if(user_id in id_intern_map)
 		{
-			if(user_id in id_intern_map)
-			{
-				throw new BaseDb.AlreadyHaveIdException(user_id);
-			}
-			// Next ID is just the next available spot in the in-mem array
-			immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
-
-			m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
-			m_mem_imgs[intern_id] = StoredImage(user_id, img.dc, img.res);
-
-			id_intern_map[user_id] = intern_id;
-
-			m_manager.addSig(intern_id, img.sig);
-
-			// Arbitrary limit so the user can't have more than 4B
-			// images in the database (and they don't overflow
-			// internal IDs).
-			enforce(m_mem_imgs.length <= intern_id_t.max);
+			throw new BaseDb.AlreadyHaveIdException(user_id);
 		}
+		// Next ID is just the next available spot in the in-mem array
+		immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
+
+		m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
+		m_mem_imgs[intern_id] = StoredImage(user_id, img.dc, img.res);
+
+		id_intern_map[user_id] = intern_id;
+
+		m_manager.addSig(intern_id, img.sig);
+
+		// Arbitrary limit so the user can't have more than 4B
+		// images in the database (and they don't overflow
+		// internal IDs).
+		enforce(m_mem_imgs.length <= intern_id_t.max);
 
 		return user_id;
+	}
+
+	user_id_t addImage(in ImageSigDcRes img)
+	{
+		user_id_t user_id = m_id_gen.next();
+		return addImage(img, user_id);
+	}
+
+	user_id_t addImage(in ImageSigDcRes img, user_id_t user_id)
+	{
+		ImageIdSigDcRes id_img = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
+		return addImage(id_img);
 	}
 
 	/**
@@ -112,6 +138,9 @@ class MemDb : BaseDb
 	 */
 	ImageIdSigDcRes removeImage(user_id_t user_id)
 	{
+		id_mutex.lock();
+		scope(exit) { id_mutex.unlock(); }
+
 		// Map to the internal ID
 		auto maybe_rm_id = user_id in id_intern_map;
 		if(maybe_rm_id is null)
@@ -119,8 +148,8 @@ class MemDb : BaseDb
 			throw new BaseDb.IdNotFoundException(user_id);
 		}
 
-		immutable auto rm_intern_id = *maybe_rm_id;
-		immutable auto rm_image     = m_mem_imgs[rm_intern_id];
+		immutable rm_intern_id = *maybe_rm_id;
+		immutable rm_image     = m_mem_imgs[rm_intern_id];
 
 		ImageSig sig = m_manager.removeId(rm_intern_id);
 
@@ -140,7 +169,6 @@ class MemDb : BaseDb
 
 			immutable last_image_sig = m_manager.removeId(last_intern_id);
 			m_manager.addSig(rm_intern_id, last_image_sig);
-			//m_manager.moveId(last_intern_id, rm_intern_id);
 		}
 
 		m_mem_imgs.length--;
@@ -148,15 +176,26 @@ class MemDb : BaseDb
 		return ImageIdSigDcRes(user_id, sig, rm_image.dc, rm_image.res);
 	}
 
-	uint numImages() { return cast(uint) m_mem_imgs.length; }
-	user_id_t nextId() { return m_id_gen.next(); }
+	uint numImages()
+	{
+		id_mutex.lock();
+		scope(exit) { id_mutex.unlock(); }
 
-	auto query(const QueryParams params)
+		return cast(uint) m_mem_imgs.length;
+	}
+
+	user_id_t peekNextId()
+	{
+		return m_id_gen.peek();
+	}
+
+	QueryResult[] query(QueryParams params)
 	{
 		return params.perform(m_manager, m_mem_imgs);
 	}
 
-	auto bucketSizeHint(BucketSizes* sizes) {
+	auto bucketSizeHint(BucketSizes* sizes)
+	{
 		return m_manager.bucketSizeHint(sizes);
 	}
 
@@ -169,7 +208,11 @@ private:
 	scope intern_id_t[user_id_t] id_intern_map;
 
 	scope BucketManager m_manager;
-	IdGen!user_id_t m_id_gen;
+	shared IdGen!user_id_t m_id_gen;
+
+	// Mutex that must be held when doing any modifications to the
+	// id_intern_map or m_mem_imgs
+	Mutex id_mutex;
 }
 
 version(unittest)
@@ -299,4 +342,19 @@ unittest {
 	db.addImage(img1);
 	auto rm = db.removeImage(img1.user_id);
 	assert(rm.sameAs(img1));
+}
+
+unittest {
+	assert(img1.user_id != img2.user_id);
+}
+
+unittest {
+	auto db = new MemDb();
+	auto id1 = db.addImage(img1);
+	auto id2 = db.addImage(img2);
+
+	assert(id1 == img1.user_id);
+	assert(id2 == img2.user_id);
+
+	assert(id1 != id2);
 }

@@ -3,17 +3,20 @@ module net.payload;
 import msgpack;
 
 import std.exception : enforce, enforceEx;
-import std.variant : Algebraic;
-import std.format : format;
+import std.variant;
+import std.string : format;
 import std.array : join;
-
-import vibe.core.net : TCPConnection;
+import std.algorithm;
+import std.socket;
+import std.stdio;
 
 import util : snakeToPascalCase, pascalToSnakeCase;
 import net.common;
+
 public import net.response;
 public import net.request;
 public import net.db_info;
+
 
 /**
  * The basics of a request/response cycle:
@@ -60,29 +63,38 @@ public import net.db_info;
  * PayloadVersion is updated when a PayloadType is added or a Payload
  * variant is modified.
  */
-enum uint PayloadVersion = 1;
+enum uint PayloadVersion = 2;
 enum PayloadType : ushort {
-	response_image_added,
+	response_pong,
 	response_db_info,
 	response_success,
 	response_failure,
-	response_pong,
 	response_version,
+	response_image_added,
 	response_list_databases,
+	response_query_results,
+	response_success_batch,
+	response_failure_batch,
+	response_server_shutdown,
+	response_image_added_batch,
+	response_unpersistable_db,
 
-	request_create_file_db,
+	request_add_image_from_pixels,
+	request_add_image_from_path,
+	request_add_image_batch,
+	request_server_shutdown,
 	request_query_from_path,
 	request_list_databases,
-	request_load_file_db,
-	request_add_image_from_path,
-	request_add_image_from_pixels,
+	request_create_level_db,
+	request_load_level_db,
 	request_remove_image,
+	request_flush_db,
 	request_version,
 	request_ping
 }
 
-
-string[] getPayloadTypesStrings() {
+string[] getPayloadTypesStrings()
+{
 	string[] ret;
 	foreach(member; __traits(allMembers, PayloadType)) {
 		ret ~=  member.snakeToPascalCase();
@@ -90,14 +102,17 @@ string[] getPayloadTypesStrings() {
 	return ret;
 }
 
+/*
+ * Expands to something like:
+ *  alias Payload = Algebraic!(
+ *	  ResponseDbInfo,
+ *    ... (all the other response/request types)
+ *	  RequestPing);
+ */
 mixin(`
 	alias Payload = Algebraic!(` ~ getPayloadTypesStrings().join(", ") ~ `);
 `);
 
-// Expands to something like:
-//alias Payload = Algebraic!(
-//	ResponseDbInfo,
-//	RequestAddImagePathToDb);
 
 class PayloadException : Exception {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
@@ -105,16 +120,22 @@ class PayloadException : Exception {
 final class InvalidPayloadException : PayloadException {
 	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
 };
+final class PayloadSocketExecption : PayloadException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
+final class PayloadSocketClosedException : PayloadException {
+	this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }
+};
 
 
 // A generic function for reading an algebraic datatype from
 // a stream. determine_payload does the work of returning
-// a Payload variant for the PayloadType read from the TCPConnection,
+// a Payload variant for the PayloadType read from the Socket,
 // given the buffer that was read from the stream. It should be
 // implemented as a final switch in most cases.
 
-// TODO: make TCPConnection an InputStream instead?
-Payload readPayload(TCPConnection conn) {
+// TODO: make Socket an InputStream instead?
+Payload readPayload(Socket conn) {
 	auto type = conn.readValue!PayloadType;
 	if(type < PayloadType.min || type > PayloadType.max) {
 		throw new InvalidPayloadException(format("Invalid PayloadType value sent: %d", cast(uint)type));
@@ -122,6 +143,7 @@ Payload readPayload(TCPConnection conn) {
 
 	uint length;
 	ubyte[] buffer;
+	uint buffer_pos;
 	scope(exit) { GC.free(buffer.ptr); }
 
 	Payload ret;
@@ -158,7 +180,7 @@ Payload readPayload(TCPConnection conn) {
 	return ret;
 }
 
-template PayloadCase(alias PayloadType type, alias Variant)
+private template PayloadCase(alias PayloadType type, alias Variant)
 {
 	static if(Variant.tupleof.length == 0)
 	{
@@ -177,7 +199,12 @@ template PayloadCase(alias PayloadType type, alias Variant)
 				length = conn.readValue!uint();
 				buffer = new ubyte[](length);
 
-				conn.read(buffer);
+				while(buffer_pos < length)
+				{
+					buffer_pos += conn.receive(buffer[buffer_pos .. $]);
+				}
+
+				assert(buffer_pos == length);
 				msgpack.unpack(buffer, variant);
 
 				ret = variant;
@@ -185,25 +212,157 @@ template PayloadCase(alias PayloadType type, alias Variant)
 	}
 }
 
-void writePayload(P)(TCPConnection conn, P request)
+/**
+ * writePayload writes a given Payload type,
+ */
+void writePayload(P)(Socket conn, P payload)
 {
 
-	mixin(q{
-		conn.writeValue!PayloadType(PayloadType.} ~ P.stringof.pascalToSnakeCase() ~ q{);
-	});
-
-	// Expands to something like this, if P is ResponseSuccess:
-	// conn.writeValue!PayloadType(PayloadType.response_success);
-
-	static if(P.tupleof.length != 0)
+	static if(is(P == Payload))
 	{
-		auto packed = msgpack.pack(request);
-		scope(exit) { GC.free(packed.ptr); }
+		// A Payload type was passed in, match on it and call a
+		// specialized writePayload
 
-		// Hopefully the server doens't send an object over 4gb
-		uint length = cast(uint)packed.length;
+		// Expands to a list of lambdas which call a specialized writePayload
+		// for each differnet Payload variant
+		const string payloadHandlers = getPayloadTypesStrings().map!(
+			(payload_type_str) {
+				return "(" ~ payload_type_str ~ " p) { conn.writePayload!" ~ payload_type_str ~ "(p); } ";
+			}
+		)().join(", ");
 
-		conn.writeValue!uint(length);
-		conn.write(packed);
+		// Pass that list into visit!()
+		mixin("payload.visit!(" ~ payloadHandlers ~ ")();");
 	}
+	else
+	{
+		// A Payload variant was directly passed in, figure out how to serialize
+		// it
+
+		// Send over the payload type header (2 bytes)
+		// Expands to something like this, if P is ResponseSuccess:
+		// conn.writeValue!PayloadType(PayloadType.response_success);
+		mixin(
+			"conn.writeValue!PayloadType(PayloadType." ~
+			P.stringof.pascalToSnakeCase() ~
+			");");
+
+		static if(P.tupleof.length != 0)
+		{
+			// The payload has members; serialize and send those
+			import std.traits;
+
+			auto packed = msgpack.pack(payload);
+			scope(exit) { GC.free(packed.ptr); }
+
+			// Hopefully the server doens't send an object over 4gb
+			uint length = cast(uint)packed.length;
+			uint sent_pos = 0;
+
+			conn.writeValue!uint(length);
+			while(sent_pos < length)
+			{
+				auto bytes_sent = conn.send(packed[sent_pos .. $]);
+				if(bytes_sent == Socket.ERROR)
+				{
+					if(conn.isAlive())
+					{
+						auto err_text = conn.getErrorText();
+						conn.close();
+						throw new PayloadSocketExecption(err_text);
+					}
+					else
+					{
+						throw new PayloadSocketClosedException("connection was closed");
+					}
+				}
+				sent_pos += bytes_sent;
+			}
+
+			enforceEx!PayloadSocketExecption(sent_pos == length,
+				format("sent: %d, actual: %d", sent_pos, length));
+		}
+
+	}
+}
+
+// Simple payload passing
+unittest
+{
+	auto pair = socketPair();
+	scope(exit) { foreach(p; pair) p.close(); }
+
+	pair[0].writePayload(Payload(ResponseSuccess()));
+
+	assert(pair[1].readPayload() == Payload(ResponseSuccess()));
+}
+
+// Connections being closed.
+unittest
+{
+	auto pair = socketPair();
+	scope(exit) { foreach(p; pair) p.close(); }
+
+	pair[0].close();
+
+	bool thrown = false;
+	try
+	{
+		pair[1].readPayload();
+	}
+	catch(ConnectionClosedException)
+	{
+		thrown = true;
+	}
+
+	assert(thrown);
+}
+
+
+// Complex Payloads being passed
+unittest
+{
+	auto pair = socketPair();
+	scope(exit) { foreach(p; pair) p.close(); }
+
+	pair[0].writePayload(Payload(ResponseVersion(1, 2, 3)));
+
+	assert(pair[1].readPayload() == Payload(ResponseVersion(1, 2, 3)));
+}
+
+// Large payloads being passed
+unittest
+{
+	import magick_wand.colorspace : RGB;
+	import core.thread : Thread;
+
+	auto pair = socketPair();
+	scope(exit) { foreach(p; pair) p.close(); }
+
+	foreach(p; pair) p.blocking = true;
+
+	RequestAddImageFromPixels req;
+
+	req.pixels = new RGB[](1024 * 1024 * 3); // 3MB "image"
+
+	foreach(index, ref px; req.pixels)
+	{
+		ubyte val = index % ubyte.max;
+		px = RGB(val, val, val);
+	}
+
+	auto sender = new Thread(() {
+		pair[0].writePayload(Payload(req));
+	});
+	sender.start();
+
+	auto resp = pair[1].readPayload().get!RequestAddImageFromPixels();
+
+	foreach(index, px; resp.pixels)
+	{
+		ubyte val = index % ubyte.max;
+		assert(px == RGB(val, val, val));
+	}
+
+	sender.join();
 }

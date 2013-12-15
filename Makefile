@@ -2,31 +2,51 @@ DC ?= dmd
 
 ifeq (64,$(MODEL))
   DC_FLAGS += -m64
-else
-  DC_FLAGS += -m32
 endif
 
 ifeq ($(OS),Windows_NT)
   EXE_EXT :=.exe
-  ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
-  	$(info Compiler is DMD)
+  ifneq (,$(findstring DMD,$(shell $(DC) 2>/dev/null | head -1)))
+    $(info Compiler is DMD)
     OBJ_EXT :=.obj
   else
+    # LDC uses a .o extension on Windows
     $(info Compiler is NOT DMD)
     OBJ_EXT :=.o
   endif
 else
+  # Non-windows, no ext for an executable
   OBJ_EXT :=.o
   EXE_EXT :=
 endif
 
-RELEASE_FLAGS         += -O -release -noboundscheck -inline
+# Adding the -release flag on DMD causes linker errors for some reason
+# (even with -allinst)
+ifeq (dmd,$(DC))
+  RELEASE_FLAGS         += -O -noboundscheck -inline -release
+else
+  RELEASE_FLAGS         += -O -release -noboundscheck -inline
+endif
+
+# ldmd2 has a bug when including debug symbols in (AT&T asm printer)
+ifeq (ldmd2,$(DC))
+  DEBUG_FLAGS           += -debug
+else
+  DEBUG_FLAGS           += -debug -gc
+endif
+
+# Ensure submodules are cloned
+GIT_SUBMODULE_UPDATE := $(shell git submodule update --init)
+
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
-DEBUG_FLAGS           += -debug -de -gc
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
 UNITTEST_DISKIO_FLAGS += $(UNITTEST_FLAGS) -version=TestOnDiskPersistence
 
-SERVER_FILES = src/server.d
+SERVER_FILES = \
+  src/server/server.d \
+  src/server/context.d \
+  src/server/connection_handler.d
+
 CLIENT_FILES = src/client.d
 TEST_RUNNER_FILES = src/test_runner.d
 
@@ -41,9 +61,13 @@ TEST_RUNNER_BIN = test_runner$(EXE_EXT)
 DIQS_DIR   := src
 DIQS_OBJ   := diqs$(OBJ_EXT)
 DIQS_FILES := \
-  $(shell ls src/image_db/*.d) \
-  $(shell ls src/magick_wand/*.d) \
-  $(shell ls src/persistence_layer/*.d) \
+  src/image_db/bucket.d \
+  src/image_db/bucket_manager.d \
+  src/image_db/mem_db.d \
+  src/image_db/base_db.d \
+  src/image_db/level_db.d \
+  src/image_db/persisted_db.d \
+  src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \
   src/haar.d \
@@ -53,6 +77,9 @@ DIQS_FILES := \
   src/types.d \
   src/util.d
 
+MAGICKWAND_OBJ   := magickwand$(OBJ_EXT)
+MAGICKWAND_FILES := $(shell ls src/magick_wand/*.d)
+
 MSGPACK_DIR   := vendor/msgpack-d/src
 MSGPACK_OBJ   := msgpack$(OBJ_EXT)
 MSGPACK_FILES := $(MSGPACK_DIR)/msgpack.d
@@ -60,54 +87,34 @@ MSGPACK_FILES := $(MSGPACK_DIR)/msgpack.d
 PAYLOAD_FILES := $(shell ls src/net/*.d)
 PAYLOAD_OBJ   := payload$(OBJ_EXT)
 
-# ====================================================================
-VIBE_DIR   := vendor/vibe-d/source
-VIBE_OBJ := vibe-d$(OBJ_EXT)
-VIBE_FILES := $(shell find \
-  vendor/vibe-d/source/vibe/core \
-  vendor/vibe-d/source/vibe/data \
-  -name '*.d' -printf "%p ") \
-  $(VIBE_DIR)/vibe/utils/hashmap.d \
-  $(VIBE_DIR)/vibe/utils/memory.d \
-  $(VIBE_DIR)/vibe/utils/array.d \
-  $(VIBE_DIR)/vibe/utils/string.d \
-  $(VIBE_DIR)/vibe/inet/path.d \
-  $(VIBE_DIR)/vibe/inet/url.d \
-  $(VIBE_DIR)/vibe/textfilter/urlencode.d \
-  $(VIBE_DIR)/vibe/textfilter/html.d
+# D_LEVELDB_DIR   := vendor/d-leveldb
+# D_LEVELDB_FILES := $(shell ls -r $(D_LEVELDB_DIR)/etc/**/*.d)
 
-ifeq ($(OS),Windows_NT)
-  ifeq (64,$(MODEL))
-    VIBE_LIBS := \
-      $(VIBE_DIR)/../lib/win-amd64/libeay32.lib \
-      $(VIBE_DIR)/../lib/win-amd64/ssleay32.lib
-  else
-    VIBE_LIBS := \
-      $(VIBE_DIR)/../lib/win-i386/event2.lib \
-      $(VIBE_DIR)/../lib/win-i386/eay.lib \
-      $(VIBE_DIR)/../lib/win-i386/ssl.lib
-  endif
+LEVELDB_DIR     := vendor/leveldb
+LEVELDB_FILES   := $(shell ls -r $(LEVELDB_DIR)/deimos/**/*.d)
 
-  VIBE_VERSIONS := -version=VibeWin32Driver
-  # OS_LIBS := wsock32.lib ws2_32.lib user32.lib
-else
-  VIBE_VERSIONS := -version=VibeLibeventDriver
-  OS_LIBS := -levent -levent_pthreads -lssl -lcrypto
+LEVELDB_OBJ     := leveldb$(OBJ_EXT)
+
+ifneq ($(OS),Windows_NT)
+  LIB_STRING := $(shell pkg-config --libs MagickWand) -lleveldb
+
+  # Preprend -L onto each linker flag (required by (l)dmd)
+  LIBS = $(foreach lib,$(LIB_STRING),-L$(lib))
+
+  # Ends up looking like this:
+  # LIBS := -L-L/opt/local/lib -L-lleveldb -L-lMagickWand -L-lMagickCore
 endif
 # ====================================================================
 
-# ====================================================================
-OPENSSL_DIR  := vendor/openssl
-LIBEVENT_DIR := vendor/libevent
-# ====================================================================
+# COMMON_OBJS = $(MAGICKWAND_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
+COMMON_OBJS = $(MAGICKWAND_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(LEVELDB_OBJ)
+ALL_OBJS    = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJS)
 
-INCLUDE_DIRS = -I$(VIBE_DIR) -I$(MSGPACK_DIR) -I$(DIQS_DIR)
+INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LEVELDB_DIR)
 
-VERSIONS = -version=VibeCustomMain $(VIBE_VERSIONS)
-DC_FLAGS += $(VERSIONS) $(INCLUDE_DIRS)
+DC_FLAGS += $(INCLUDE_DIRS)
 
 ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN)
-# ALL_BIN = $(SERVER_BIN)
 
 .PHONY: all
 all: debug
@@ -122,58 +129,62 @@ release: $(ALL_BIN)
 
 .PHONY: unittest
 unittest: DC_FLAGS += $(UNITTEST_FLAGS)
-unittest: $(TEST_RUNNER_BIN)
-	$(TEST_RUNNER_BIN)
+unittest: $(ALL_BIN) $(TEST_RUNNER_BIN)
+	./$(TEST_RUNNER_BIN)
 
 .PHONY: unittest_diskio
 unittest_diskio: DC_FLAGS += $(UNITTEST_DISKIO_FLAGS)
 unittest_diskio: $(TEST_RUNNER_BIN)
-	$(TEST_RUNNER_BIN)
+	./$(TEST_RUNNER_BIN)
 
 .PHONY: speedtest
 speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
 speedtest: $(TEST_RUNNER_BIN)
 
 # ==============================================================================
-$(SERVER_BIN): $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
-	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(SERVER_BIN)
+$(SERVER_BIN):      $(SERVER_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(SERVER_BIN)
 
-$(SERVER_OBJ): $(SERVER_FILES)
-	$(DC) $(INCLUDE_DIRS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
+$(SERVER_OBJ):      $(SERVER_FILES)
+	$(DC) $(DC_FLAGS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(CLIENT_BIN): $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
-	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(CLIENT_BIN)
+$(CLIENT_BIN):      $(CLIENT_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
 
-$(CLIENT_OBJ): $(CLIENT_FILES)
-	$(DC) $(INCLUDE_DIRS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
+$(CLIENT_OBJ):      $(CLIENT_FILES)
+	$(DC) $(DC_FLAGS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ)
-	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(VIBE_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(VIBE_LIBS) -of$(TEST_RUNNER_BIN)
+$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(COMMON_OBJS)
+	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(TEST_RUNNER_BIN)
 
 $(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 
+$(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
+	$(DC) $(DC_FLAGS) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
 
-$(PAYLOAD_OBJ): $(PAYLOAD_FILES)
-	$(DC) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
+$(DIQS_OBJ):        $(DIQS_FILES)
+	$(DC) $(DC_FLAGS) $(DIQS_FILES) -c -of$(DIQS_OBJ)
 
-$(DIQS_OBJ): $(DIQS_FILES)
-	$(DC) $(DC_FLAGS) $(DIQS_FILES)    -c -of$(DIQS_OBJ)
-
-$(VIBE_OBJ): $(VIBE_FILES)
-	$(DC) $(DC_FLAGS) $(VIBE_FILES)    -c -of$(VIBE_OBJ)
-
-$(MSGPACK_OBJ): $(MSGPACK_FILES)
+$(MSGPACK_OBJ):     $(MSGPACK_FILES)
 	$(DC) $(DC_FLAGS) $(MSGPACK_FILES) -c -of$(MSGPACK_OBJ)
+
+$(MAGICKWAND_OBJ):  $(MAGICKWAND_FILES)
+	$(DC) $(DC_FLAGS) $(MAGICKWAND_FILES) -c -of$(MAGICKWAND_OBJ)
+
+$(LEVELDB_OBJ):     $(LEVELDB_FILES)
+	$(DC) $(DC_FLAGS) $(LEVELDB_FILES) $(D_LEVELDB_FILES) -c -of$(LEVELDB_OBJ)
 
 .PHONY: clean
 clean:
+	rm -f $(TEST_RUNNER_BIN)
+	rm -f $(SERVER_BIN)
+	rm -f $(CLIENT_BIN)
 	rm -rf bin/*.*
-	rm -rf *.obj
-	rm -rf *.o
+	rm -f $(ALL_OBJS)
 	rm -rf *.exe

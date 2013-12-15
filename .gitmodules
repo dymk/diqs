@@ -10,3 +10,6 @@
 [submodule "vendor/libevent"]
 	path = vendor/libevent
 	url = https://github.com/D-Programming-Deimos/libevent.git
+[submodule "vendor/leveldb"]
+	path = vendor/leveldb
+	url = https://github.com/bheads/leveldb.git

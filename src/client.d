@@ -8,246 +8,465 @@ import net.payload;
 import net.common;
 import net.db_info;
 
-import vibe.core.net : connectTCP;
-import vibe.core.core : sleep;
-import vibe.core.log;
-
-import std.stdio : write, writeln, writefln, readln;
+import std.file;
+import std.stdio : write, writef, writeln, writefln, readln;
 import std.getopt : getopt;
 import std.variant : tryVisit;
 import std.array : split;
-import std.format : formattedRead, format;
-import std.string : chomp;
+import std.format : formattedRead;
+import std.string : chomp, strip, format;
 import std.datetime : dur;
+//import std.socket : createSocket, TcpSocket, SocketShutdown;
+import std.socket;
 
 int main(string[] args)
 {
-	ushort port = DefaultPort;
-	string host = DefaultHost;
-	bool   help = false;
+  ushort port = DefaultPort;
+  string host = DefaultHost;
+  bool   help = false;
 
-	try {
-		getopt(args, "help|h", &help, "host|h", &host, "port|p", &port);
-	} catch(Exception e) {
-		logCritical(e.msg);
-		printUsage();
-		return 1;
-	}
+  try
+  {
+    getopt(args, "help|h", &help, "host|h", &host, "port|p", &port);
+  }
+  catch(Exception e)
+  {
+    writeln(e.msg);
+    printUsage();
+    return 1;
+  }
 
-	if(help) {
-		printUsage();
-		return 0;
-	}
+  if(help)
+  {
+    printUsage();
+    return 0;
+  }
 
-	logInfo("Connecting to %s:%d", host, port);
-	auto conn = connectTCP(host, port);
+  writefln("Connecting to %s:%d", host, port);
 
-	conn.writePayload(RequestVersion());
-	conn.readPayload().tryVisit!((ResponseVersion r) {
-			writefln("Connected to DIQS Server %d.%d.%d", r.major, r.minor, r.patch);
-		}
-	)();
+  Socket conn;
+  try {
+    conn = new TcpSocket(AddressFamily.INET);
+    conn.blocking = true;
+    conn.connect(new InternetAddress(host, port));
+  }
+  catch(SocketOSException e)
+  {
+    writefln("Wasn't able to connect to the server (%s)", e.msg);
+    return 1;
+  }
 
-	static printDbInfo(DbInfo db_info) {
-		final switch(db_info.type) with(DbInfo.Type) {
-			case Mem:
-				writefln("MemDb:  | ID: %5d | Images: %5d", db_info.id, db_info.num_images);
-				break;
-			case File:
-				writefln("FileDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
-				break;
-		}
-	}
+  scope(exit)
+  {
+    conn.shutdown(SocketShutdown.BOTH);
+    conn.close();
+  }
 
-	void listRemoteDbs() {
-		conn.writePayload(RequestListDatabases());
+  conn.writePayload(RequestVersion());
+  conn.readPayload().tryVisit!((ResponseVersion r) {
+      writefln("Connected to DIQS Server %s", r.versionString());
+    }
+  )();
 
-		DbInfo[] databases = conn.readPayload().tryVisit!(
-			(ResponseListDatabases resp) {
-				return resp.databases;
-			}
-		)();
+  static printDbInfo(DbInfo db_info) {
+    final switch(db_info.type) with(DbInfo.Type) {
+      case Mem:
+        writefln("MemDb:       | ID: %5d | Images: %5d", db_info.id, db_info.num_images);
+        break;
+      case Persisted:
+        writefln("PersistedDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
+        break;
+    }
+  }
 
-		writefln("Databases: (%d) ", databases.length);
-		foreach(db; databases) {
-			printDbInfo(db);
-		}
-		writeln();
-	}
+  immutable handleFailure = (ResponseFailure r) {
+    writefln("Failure | %s", r.code);
+  };
 
-	// An attempt to DRY up the addImage and addImageRemote functions
-	void setupAddImageRequest(P)(ref P req, user_id_t db_id, user_id_t image_id, bool gen_image_id)
-	{
-		req.db_id = db_id;
+  void listRemoteDbs() {
+    conn.writePayload(RequestListDatabases());
 
-		if(gen_image_id) {
-			req.generate_id = true;
-			req.image_id = image_id;
-		} else {
-			req.generate_id = false;
-		}
-	}
+    DbInfo[] databases = conn.readPayload().tryVisit!(
+      (ResponseListDatabases resp) {
+        return resp.databases;
+      }
+    )();
 
-	void addImage(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
-		RequestAddImageFromPath req;
-		setupAddImageRequest(req, db_id, image_id, gen_image_id);
-		req.image_path = image_path;
+    writefln("Databases: (%d) ", databases.length);
+    foreach(db; databases) {
+      printDbInfo(db);
+    }
+    writeln();
+  }
 
-		conn.writePayload(req);
-		Payload resp = conn.readPayload();
+  // An attempt to DRY up the addImage and addImageRemote functions
+  void setupAddImageRequest(P)(
+        ref P req,
+    user_id_t db_id,
+    user_id_t image_id,
+         bool use_image_id,
+         bool flush_db_after_add)
+  {
+    req.db_id = db_id;
+    req.use_image_id = use_image_id;
+    req.image_id = image_id;
+    req.flush_db_after_add = flush_db_after_add;
+  }
 
-		resp.tryVisit!(
-			(ResponseImageAdded r) {
-				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
-			},
-			(ResponseFailure r) {
-				writefln("Failure | %s", r.code);
-			}
-		)();
-	}
+  void addImage(
+       string image_path,
+    user_id_t db_id,
+    user_id_t image_id,
+         bool use_image_id,
+         bool flush_db_after_add = true)
+  {
+    RequestAddImageFromPath req;
+    setupAddImageRequest(req, db_id, image_id, use_image_id, flush_db_after_add);
 
-	void addImageRemote(string image_path, user_id_t db_id, user_id_t image_id, bool gen_image_id) {
-		RequestAddImageFromPixels req;
-		setupAddImageRequest(req, db_id, image_id, gen_image_id);
+    req.image_path = image_path;
 
-		try {
-			auto wand = MagickWand.fromFile(image_path);
-			scope(exit) { MagickWand.disposeWand(wand); }
+    conn.writePayload(req);
+  }
 
-			req.width =  cast(uint) wand.imageWidth();
-			req.height = cast(uint) wand.imageHeight();
+  void addImageRemote(
+       string image_path,
+    user_id_t db_id,
+         bool local_resize,
+    user_id_t image_id,
+         bool use_image_id,
+         bool flush_db_after_add = true)
+  {
+    RequestAddImageFromPixels req;
+    setupAddImageRequest(req, db_id, image_id, use_image_id, flush_db_after_add);
 
-			ImageSig.resizeWand(wand);
-			req.pixels = wand.exportImagePixelsFlatEx!RGB();
-		}
-		catch(WandException e)
-		{
-			logError("Couldn't process image file %s: %s", image_path, e);
-			return;
-		}
+    try {
+      auto wand = MagickWand.fromFile(image_path);
+      scope(exit) { MagickWand.disposeWand(wand); }
 
-		scope(exit) { GC.free(req.pixels.ptr); }
+      req.original_res = ImageRes(
+        cast(ushort) wand.imageWidth(),
+        cast(ushort) wand.imageHeight()
+      );
 
-		conn.writePayload(req);
-		Payload resp = conn.readPayload();
+      if(local_resize) {
+        ImageSig.resizeWand(wand);
+      }
 
-		resp.tryVisit!(
-			(ResponseImageAdded r) {
-				writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
-			},
-			(ResponseFailure r) {
-				writefln("Failure | %s", r.code);
-			}
-		)();
-	}
+      req.pixels_res = ImageRes(
+        cast(ushort) wand.imageWidth(),
+        cast(ushort) wand.imageHeight()
+      );
 
-	void genericLoadCreateFileDb(Req)(string db_path)
-	if(is(Req == RequestCreateFileDb) || is(Req == RequestLoadFileDb))
-	{
-		Req req;
-		req.db_path = db_path;
+      req.pixels = wand.exportImagePixelsFlatEx!RGB();
+    }
+    catch(WandException e)
+    {
+      writeln("Couldn't process image file %s: %s", image_path, e);
+      return;
+    }
 
-		conn.writePayload(req);
-		conn.readPayload().tryVisit!(
-			(ResponseDbInfo r) {
-				writeln("Loaded database: ");
-				printDbInfo(r.db);
-			},
-			(ResponseFailure r) {
-				writefln("Failure | %s", r.code);
-			}
-		)();
-	}
+    scope(exit) { GC.free(req.pixels.ptr); }
 
-	while(true) {
-		write("Select action (help): ");
-		auto cmd_string = readln();
-		if(cmd_string) {
-			cmd_string = cmd_string.chomp();
-		} else {
-			cmd_string = "";
-		}
-		auto cmd_parts = cmd_string.split(" ");
+    conn.writePayload(req);
+  }
 
-		string command;
-		if(cmd_parts.length == 0)
-			command = "";
-		else
-			command = cmd_parts[0];
+  void genericLoadCreateLevelDb(Req)(Req req)
+  if(is(Req == RequestCreateLevelDb) || is(Req == RequestLoadLevelDb))
+  {
+    conn.writePayload(req);
+    conn.readPayload().tryVisit!(
+      handleFailure,
+      (ResponseDbInfo r) {
+        writeln("Loaded database: ");
+        printDbInfo(r.db);
+      }
+    )();
+  }
 
-		if(command == "help" || command == "") {
-			printCommands();
-		}
+  void genericHandleImageAddResponse()
+  {
+    Payload resp = conn.readPayload();
+    resp.tryVisit!(
+      handleFailure,
+      (ResponseImageAdded r) {
+        writefln("Success | ID: %5d (DBID: %d)", r.image_id, r.db_id);
+      }
+    )();
+  }
 
-		else if(command == "lsDbs") {
-			listRemoteDbs();
-		}
+  void flushDatabase(user_id_t db_id)
+  {
+    RequestFlushDb req = RequestFlushDb(db_id);
+    conn.writePayload(req);
+    Payload resp = conn.readPayload();
 
-		else if(command == "createFileDb") {
-			if(cmd_parts.length != 2) {
-				writeln("createFileDb requires 1 argument");
-				continue;
-			}
+    writef("DBID: %d: ", db_id);
+    resp.tryVisit!(
+      (ResponseUnpersistableDb r)
+      {
+        writeln("Database is not persistable! Didn't flush");
+      },
+      (ResponseSuccess r)
+      {
+        writeln("Success");
+      },
+      handleFailure
+    )();
+  }
 
-			string db_path = cmd_parts[1];
-			genericLoadCreateFileDb!RequestCreateFileDb(db_path);
-		}
+  while(conn.isAlive()) {
+    write("Select action (help): ");
+    char[] buffer;
+    auto len = readln(buffer);
 
-		else if(command == "loadFileDb") {
-			if(cmd_parts.length != 2) {
-				writeln("loadFileDb requires 1 argument");
-				continue;
-			}
+    if(len == 0) {
+      break;
+    }
 
-			string db_path = cmd_parts[1];
-			genericLoadCreateFileDb!RequestLoadFileDb(db_path);
-		}
+    if(buffer) {
+      buffer = buffer.chomp.strip;
+    } else {
+      buffer = "".dup;
+    }
 
-		else if(command == "addImage" || command == "addImageRemote") {
-			if(cmd_parts.length < 3 || cmd_parts.length > 4) {
-				writefln("%s requires 2 or 3 arguments", command);
-				continue;
-			}
+    scope scope_cmd_parts = buffer.idup.split();
+    string[] cmd_parts = scope_cmd_parts;
 
-			string image_path;
-			user_id_t db_id;
+    string command;
+    if(cmd_parts.length == 0)
+      command = "";
+    else {
+      command = cmd_parts[0];
+      cmd_parts = cmd_parts[1..$];
+    }
 
-			image_path = cmd_parts[1];
-			formattedRead(cmd_parts[2], "%d", &db_id);
+    if(command == "help" || command == "") {
+      printCommands();
+    }
 
-			bool gen_image_id = (cmd_parts.length == 4);
-			user_id_t image_id;
+    else if(command == "lsDbs")
+    {
+      listRemoteDbs();
+    }
 
-			if(!gen_image_id) {
-				formattedRead(cmd_parts[3], "%d", &image_id);
-			}
+    else if(command == "createLevelDb")
+    {
+      if(cmd_parts.length != 1) {
+        writeln("createLevelDb requires 1 argument");
+        continue;
+      }
 
-			if(command == "addImage") {
-				addImage(image_path, db_id, image_id, gen_image_id);
-			} else {
-				addImageRemote(image_path, db_id, image_id, gen_image_id);
-			}
-		}
+      string db_path = cmd_parts[0];
+      genericLoadCreateLevelDb(RequestCreateLevelDb(db_path));
+    }
 
-		else {
-			writefln("Unknown command '%s'", command);
-		}
-	}
+    else if(command == "loadLevelDb")
+    {
+      if(cmd_parts.length < 1 || cmd_parts.length > 2) {
+        writeln("loadLevelDb requires 1 or 2 argument");
+        continue;
+      }
+
+      string db_path = cmd_parts[0];
+      bool create_if_not_exist = false;
+
+      if(cmd_parts.length == 2)
+        create_if_not_exist = true;
+
+      genericLoadCreateLevelDb(RequestLoadLevelDb(db_path, create_if_not_exist));
+    }
+
+    else if(command == "addImage")
+    {
+      if(cmd_parts.length < 2 || cmd_parts.length > 3) {
+        writefln("addImage requires 2 or 3 arguments");
+        continue;
+      }
+
+      string image_path;
+      user_id_t db_id;
+
+      image_path = cmd_parts[0];
+      formattedRead(cmd_parts[1], "%d", &db_id);
+
+      bool use_image_id = (cmd_parts.length == 3);
+
+      user_id_t image_id;
+      if(use_image_id) {
+        formattedRead(cmd_parts[2], "%d", &image_id);
+      }
+
+      addImage(image_path, db_id, image_id, use_image_id);
+      genericHandleImageAddResponse();
+    }
+
+    else if(command == "addImageRemote")
+    {
+      if(cmd_parts.length < 2 || cmd_parts.length > 4) {
+        writefln("addImageRemote requires 2 to 4 arguments");
+        continue;
+      }
+
+      string image_path;
+      user_id_t db_id;
+
+      image_path = cmd_parts[0];
+      formattedRead(cmd_parts[1], "%d", &db_id);
+
+      bool use_image_id = (cmd_parts.length == 4);
+
+      bool local_resize;
+      if(cmd_parts.length >= 3) {
+        // If the LOCAL_RESIZE was 1, then resize on this machine.
+        // Else, let the server take care of resizing.
+        int local_resize_val;
+        formattedRead(cmd_parts[2], "%d", &local_resize_val);
+
+        local_resize = local_resize_val == 1;
+      }
+
+      user_id_t image_id;
+      if(use_image_id) {
+        formattedRead(cmd_parts[3], "%d", &image_id);
+      }
+
+      addImageRemote(image_path, db_id, local_resize, image_id, use_image_id);
+      genericHandleImageAddResponse();
+    }
+
+    else if(command == "addImageBatch")
+    {
+      if(cmd_parts.length < 2 || cmd_parts.length > 3)
+      {
+        writefln("addImageBatch takes 2 or 3 arguments");
+        continue;
+      }
+
+      auto folder = cmd_parts[0];
+      user_id_t db_id = to!user_id_t(cmd_parts[1]);
+
+      RequestAddImageBatch req;
+      req.folder = folder;
+      req.db_id = db_id;
+
+      if(cmd_parts.length == 3)
+      {
+        req.flush_per_added = to!int(cmd_parts[2]);
+      }
+      else
+      {
+        req.flush_per_added = 500;
+      }
+
+      conn.writePayload(req);
+
+      // Keep reading batch image adds/failures until we get a success
+      // message, or a fatal error.
+      bool keep_reading = true;
+      while(keep_reading)
+      {
+        Payload resp = conn.readPayload();
+        resp.tryVisit!(
+          (ResponseImageAddedBatch r)
+          {
+            writefln("s::%s::%d::%d", r.image_path, r.db_id, r.image_id);
+          },
+          (ResponseFailureBatch r)
+          {
+            writefln("f::%s::%d", r.image_path, r.code);
+          },
+          (ResponseSuccessBatch r)
+          {
+            writefln("Done, %d images added; %d failures", r.num_images_added, r.num_failures);
+            keep_reading = false;
+          },
+          (ResponseFailure r)
+          {
+            writefln("Fatal error during batch add: %d", r.code);
+            keep_reading = false;
+          }
+        )();
+      }
+    }
+
+    else if(command == "flushDb")
+    {
+      if(cmd_parts.length != 1)
+      {
+        writeln("flushDb takes 1 argument");
+        continue;
+      }
+
+      user_id_t db_id = to!user_id_t(cmd_parts[0]);
+      flushDatabase(db_id);
+    }
+
+    else if(command == "queryImage")
+    {
+      if(cmd_parts.length < 2 || cmd_parts.length > 3) {
+        writeln("queryImage requires 2 or 3 arguments");
+        continue;
+      }
+
+      string image_path = cmd_parts[0];
+      user_id_t db_id;
+      formattedRead(cmd_parts[1], "%d", &db_id);
+
+      uint num_results = 10;
+      if(cmd_parts.length == 3) {
+        formattedRead(cmd_parts[2], "%d", &num_results);
+      }
+
+      conn.writePayload(RequestQueryFromPath(db_id, image_path, num_results));
+      conn.readPayload().tryVisit!(
+        handleFailure,
+        (ResponseQueryResults resp) {
+          writefln("Query took %d milliseconds to perform", resp.duration);
+          foreach(result; resp.results)
+          {
+            writefln("ID: %8d | Sim: %2.2f | Res: %dx%d",
+              result.user_id, result.similarity,
+              result.res.width, result.res.height);
+          }
+        }
+      )();
+    }
+
+    else if (command == "shutdown")
+    {
+      conn.writePayload(RequestServerShutdown());
+      conn.readPayload().tryVisit!(
+        handleFailure,
+        (ResponseServerShutdown resp) {
+          writeln("Success, server shut down");
+        }
+      )();
+
+      return 0;
+    }
+
+    else {
+      writefln("Unknown command '%s'", command);
+    }
+  }
+
+  return 0;
 }
 
 void printCommands() {
-	writeln(`
+  writeln(`
   help
     Print this help
 
   lsDbs
     List the databases available on the server
 
-  loadFileDb PATH
+  loadLevelDb PATH [CREATE_IF_NOT_EXIST]
     Loads a file database on the server at PATH. Fails if the database
-    does not exist.
+    does not exist. If CREATE_IF_NOT_EXIST is 1, then the database is
+    created if it doesn't exist.
 
-  createFileDb PATH
+  createLevelDb PATH
     Creates and loads new file database on the server at PATH.
     Fails if the database already exists.
 
@@ -256,16 +475,34 @@ void printCommands() {
     not specified, then a DB-unique ID is generated for the image. Assumes
     that PATH is accessible to the server.
 
-  addImageRemote PATH DBID [IMGID]
+  addImageRemote PATH DBID [LOCAL_RESIZE = 1 [IMGID]]
     Adds an image to the database, like addImage. However, this command is
     used when the server is on a remote machine without access to the file
     at PATH, and needs to be transmitted to the server over the network.
-    Resizing is done on the client to conserve network bandwidth.
+    If LOCAL_RESIZE is 1, then the image is resized on the client and sent
+    to the server, else, the resizing is done on the server. It's recommended
+    that LOCAL_RESIZE is set to 1 if images are being transmitted over a low
+    bandwidth connection. Defaults to 1.
+
+  flushDb DBID
+    Flushes a database to whatever medium it's persisted on
+
+  addImageBatch PATH DBID [FLUSH_PER=500]
+    Adds a set of images to the database, where PATH is the path
+    to a folder of images. The database is flushed (if it supports that)
+    every FLUSH_PER images added (by default, the DB is flushed every 500
+    images added).
+
+  queryImage PATH DBID [NUM_RESULTS = 10]
+    Perform a similarity query, listing the top NUM_RESULTS matches.
+
+  shutdown
+    Shuts down the server and closes all connections
 `);
 }
 
 void printUsage() {
-	writefln(
+  writefln(
 `
   Usage: server [Options...]
 
@@ -281,5 +518,5 @@ void printUsage() {
       Set the host/address of the DIQS server to connect to
       Default Value: %s
 `,
-	DefaultPort, DefaultHost);
+  DefaultPort, DefaultHost);
 }

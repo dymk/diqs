@@ -52,7 +52,6 @@ struct ReservedArray(T)
 	{
 		if(reserved_data.length < other.length)
 		{
-			GC.free(reserved_data.ptr);
 			reserved_data = new T[other.length];
 		}
 

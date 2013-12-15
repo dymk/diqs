@@ -130,7 +130,7 @@ struct ImageSigDcRes
 		ImageSig.resizeWand(wand);
 
 		auto pixels = wand.exportImagePixelsFlatEx!YIQ();
-		scope(exit) { GC.free(pixels.ptr); }
+		//scope(exit) { GC.free(pixels.ptr); }
 
 		scope ychan = pixels.map!(a => cast(coeff_t)a.y).array();
 		scope ichan = pixels.map!(a => cast(coeff_t)a.i).array();
@@ -179,6 +179,7 @@ struct ImageSigDcRes
 	{
 		auto wand = MagickWand.fromFile(file);
 		scope(exit) { MagickWand.disposeWand(wand); }
+
 		return ImageSigDcRes.fromWand(wand);
 	}
 }
@@ -200,21 +201,55 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	version(unittest) {
-		bool sameAs(ImageIdSigDcRes other) const {
-			return (
-				other.user_id == this.user_id &&
-				other.dc == this.dc &&
-				other.res == this.res &&
-				other.sig.sameAs(this.sig));
-		}
+	static ImageIdSigDcRes fromSigDcRes(in ImageSigDcRes img, user_id_t user_id)
+	{
+		return ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
 	}
 }
 
 version(unittest) {
-	ImageIdSigDcRes imageFromFile(user_id_t id, string path) {
-		ImageSigDcRes i = ImageSigDcRes.fromFile(path);
-		ImageIdSigDcRes img = ImageIdSigDcRes(id, i.sig, i.dc, i.res);
-		return img;
+	bool sameAs(ImageIdSigDcRes a, ImageIdSigDcRes b) {
+		return (
+			a.user_id == b.user_id &&
+			     a.dc == b.dc &&
+			    a.res == b.res &&
+			a.sig.sameAs(b.sig));
 	}
+}
+
+version(unittest)
+{
+	ImageSigDcRes*[string] alreadyLoaded;
+
+	ImageIdSigDcRes imageFromFile(user_id_t id, string path)
+	{
+		auto i = imageFromFile(path);
+		return ImageIdSigDcRes(id, i.sig, i.dc, i.res);
+	}
+
+	ImageSigDcRes imageFromFile(string path)
+	{
+		if(path !in alreadyLoaded)
+		{
+			writeln("Caching signature for image " ~ path);
+			auto allocd = new ImageSigDcRes;
+			auto reted = ImageSigDcRes.fromFile(path);
+
+			allocd.sig = reted.sig;
+			allocd.dc = reted.dc;
+			allocd.res = reted.res;
+
+			alreadyLoaded[path] = allocd;
+		}
+
+		auto i = alreadyLoaded[path];
+		return ImageSigDcRes(i.sig, i.dc, i.res);
+	}
+}
+
+unittest
+{
+	ImageSigDcRes data = ImageSigDcRes.fromFile("test/cat_a1.jpg");
+	assert(data.res == ImageRes(650, 433));
+	assert(data != ImageSigDcRes.init);
 }
