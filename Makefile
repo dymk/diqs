@@ -6,14 +6,16 @@ endif
 
 ifeq ($(OS),Windows_NT)
   EXE_EXT :=.exe
-  ifneq (,$(findstring 2.063,$(shell $(DC) 2>/dev/null | head -1)))
+  ifneq (,$(findstring DMD,$(shell $(DC) 2>/dev/null | head -1)))
     $(info Compiler is DMD)
     OBJ_EXT :=.obj
   else
+    # LDC uses a .o extension on Windows
     $(info Compiler is NOT DMD)
     OBJ_EXT :=.o
   endif
 else
+  # Non-windows, no ext for an executable
   OBJ_EXT :=.o
   EXE_EXT :=
 endif
@@ -34,7 +36,7 @@ else
 endif
 
 # Ensure submodules are cloned
-GIT_SUBMODULE_UPDATE = $(shell git submodule update --init)
+GIT_SUBMODULE_UPDATE := $(shell git submodule update --init)
 
 SPEEDTEST_FLAGS       += $(RELEASE_FLAGS) -version=SpeedTest
 UNITTEST_FLAGS        += -unittest $(DEBUG_FLAGS)
