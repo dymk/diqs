@@ -3,7 +3,7 @@ before_install:
   - chmod +x ./.travis_scripts/*.sh
 
 install:
-  - ./.travis_scripts/install_levledb.sh
+  - ./.travis_scripts/install_leveldb.sh
   - if [[ "$DC" == "dmd" ]];   then . ./.travis_scripts/install_dmd.sh; fi;
   - if [[ "$DC" == "ldmd2" ]]; then . ./.travis_scripts/install_ldmd2.sh; fi;
   - $DC | head -3
