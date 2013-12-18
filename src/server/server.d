@@ -10,7 +10,7 @@ import net.common;
 import server.connection_handler;
 import server.context;
 
-import image_db.base_db : BaseDb, IdGen;
+import image_db.base_db;
 
 import magick_wand.wand;
 

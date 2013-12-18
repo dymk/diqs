@@ -1,7 +1,7 @@
 module image_db.level_db;
 
-import image_db.persisted_db;
-import image_db.mem_db;
+import image_db.all;
+import image_db.bucket_manager;
 import sig;
 
 import msgpack;
@@ -32,7 +32,7 @@ shared static ~this()
   WriteOptions = null;
 }
 
-final class LevelDb : PersistedDb
+final class LevelDb : PersistedDb, ReservableDb
 {
 private:
   // The memdb that has queries delegated to it
@@ -124,11 +124,11 @@ public:
 
     size_t vallen;
     auto valptr = leveldb_get(
-      cast(void*) db, 
-      ReadOptions, 
-      cast(char*) &user_id, 
-      user_id_t.sizeof, 
-      &vallen, 
+      cast(void*) db,
+      ReadOptions,
+      cast(char*) &user_id,
+      user_id_t.sizeof,
+      &vallen,
       &errptr);
 
     scope(exit)
@@ -154,7 +154,7 @@ public:
     enforce(was_in_level);
 
     version(assert)
-    { 
+    {
       // Ensure that the image in the memory database is the same as the one on the
       // disk
       ImageIdSigDc mem_ret;
@@ -251,6 +251,15 @@ public:
     return db_path;
   }
 
+  // Reserves room for 'amt' images in the database
+  void reserve(size_t amt)
+  {
+    if(mem_db)
+    {
+      mem_db.reserve(amt);
+    }
+  }
+
 private:
   void load()
   {
@@ -344,9 +353,9 @@ private:
     }
 
   private:
-    void enforceIter() const 
-    { 
-      enforce(_iter, "Iterator has been closed"); 
+    void enforceIter() const
+    {
+      enforce(_iter, "Iterator has been closed");
     }
 
     leveldb_iterator_t _iter;

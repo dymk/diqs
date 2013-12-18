@@ -4,13 +4,12 @@ module image_db.mem_db;
  * Represents an in memory, searchable database of images
  */
 
-import image_db.bucket_manager :
-  BucketManager,
-  BucketSizes;
-import image_db.base_db : BaseDb, IdGen;
+import image_db.bucket_manager;
+import image_db.all;
 import types :
   user_id_t,
   intern_id_t;
+
 import sig;
 
 import query :
@@ -22,7 +21,7 @@ import std.algorithm : min, max;
 import std.exception : enforce;
 import core.sync.mutex;
 
-final class MemDb : BaseDb
+final class MemDb : BaseDb, ReservableDb
 {
 	alias StoredImage = ImageIdDc;
 
@@ -36,8 +35,8 @@ final class MemDb : BaseDb
 
 	this(size_t size_hint)
 	{
-		m_mem_imgs.reserve(size_hint);
 		this();
+		reserve(size_hint);
 	}
 
 	/**
@@ -198,6 +197,11 @@ final class MemDb : BaseDb
 	auto bucketSizes()
 	{
 		return m_manager.bucketSizes();
+	}
+
+	void reserve(size_t amt)
+	{
+		m_mem_imgs.reserve(numImages() + amt);
 	}
 
 private:

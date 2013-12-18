@@ -63,10 +63,12 @@ DIQS_OBJ   := diqs$(OBJ_EXT)
 DIQS_FILES := \
   src/image_db/bucket.d \
   src/image_db/bucket_manager.d \
+  src/image_db/all.d \
   src/image_db/mem_db.d \
   src/image_db/base_db.d \
   src/image_db/level_db.d \
   src/image_db/persisted_db.d \
+  src/image_db/reservable_db.d \
   src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \

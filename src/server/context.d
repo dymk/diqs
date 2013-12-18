@@ -5,8 +5,7 @@ import std.variant;
 import std.path;
 import std.exception;
 
-import image_db.mem_db;
-import image_db.persisted_db;
+import image_db.all;
 
 import net.db_info;
 
@@ -92,10 +91,10 @@ class Context
     foreach(id, db; databases)
     {
       db.tryVisit!(
-        (PersistedDb db) 
-        { 
+        (PersistedDb db)
+        {
           writefln("Closing database at %s", db.path());
-          db.close(); 
+          db.close();
         }
       )();
     }

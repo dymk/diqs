@@ -17,7 +17,7 @@ import delta_queue : DeltaQueue;
 
 struct Bucket
 {
-	enum GUESS_SET_LEN =   5_000;
+	enum GUESS_SET_LEN = 500;
 	enum MAX_SET_LEN   = 500_000;
 
 	alias IdContainer = DeltaQueue!intern_id_t;

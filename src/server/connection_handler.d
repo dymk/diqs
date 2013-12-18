@@ -7,10 +7,7 @@ import query;
 import net.payload;
 import net.common;
 import magick_wand.wand;
-import image_db.level_db;
-import image_db.mem_db;
-import image_db.persisted_db;
-import image_db.base_db;
+import image_db.all;
 
 import server.server;
 import server.context;
@@ -300,7 +297,6 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
     }
   }
 
-  auto image_entries = dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.shallow);
 
   shared int num_added = 0;
   shared int num_failures = 0;
@@ -316,7 +312,31 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
 
   }
 
-  foreach(image_path; taskPool.parallel(image_entries))
+  auto imageFiles()
+  {
+    return dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.shallow);
+  }
+
+  // Try and reserve space in the DB if it supports it
+  {
+    writeln("Calculating number of images in dir...");
+    size_t num_images = 0;
+    foreach(img; imageFiles())
+    {
+      num_images++;
+    }
+
+    writeln("Reserving space...");
+    ReservableDb rdb = cast(ReservableDb) db;
+    if(rdb !is null)
+    {
+      rdb.reserve(num_images);
+    }
+    writefln("Adding %d images...", num_images);
+  }
+
+  // call dirEntries again because there isn't a way to reset the returned DirIterator
+  foreach(image_path; taskPool.parallel(imageFiles()))
   {
 
     with (ResponseFailure.Code)
