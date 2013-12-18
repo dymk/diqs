@@ -26,6 +26,7 @@ import std.math : abs;
 import std.stdio : writeln;
 import std.container : heapify;
 import std.algorithm : sort, min, max, reverse;
+import std.parallelism;
 import core.memory : GC;
 
 struct QueryResult
@@ -62,7 +63,7 @@ struct QueryParams
 		auto weights = Weights[is_sketch ? 1 : 0];
 		immutable dc_weight_bin = 0;
 
-		foreach(index, ref img; db_images)
+		foreach(index, ref img; taskPool.parallel(db_images))
 		{
 			immutable ImageDc dc = img.dc;
 
@@ -89,9 +90,14 @@ struct QueryParams
 
 				total_bucket_weight += weight;
 
-				foreach(image_index; bucket.opSlice())
+				// Bucket ID sets are ~5K in size, so process them in parallel
+				// as it's guarenteed that a bucket won't have the same image ID twice.
+				foreach(bucket_set; taskPool.parallel(bucket.opSlice().sets))
 				{
-					scores[image_index] -= weight;
+					foreach(image_index; bucket_set)
+					{
+						scores[image_index] -= weight;
+					}
 				}
 			}
 		}
