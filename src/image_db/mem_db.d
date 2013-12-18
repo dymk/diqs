@@ -195,6 +195,11 @@ final class MemDb : BaseDb
 		return m_manager.bucketSizeHint(sizes);
 	}
 
+	auto bucketSizes()
+	{
+		return m_manager.bucketSizes();
+	}
+
 private:
 	// Maps a user_id to its index in m_mem_imgs
 	//scope immutable(StoredImage)[] m_mem_imgs;

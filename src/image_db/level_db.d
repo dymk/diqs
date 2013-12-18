@@ -4,11 +4,7 @@ import image_db.persisted_db;
 import image_db.mem_db;
 import sig;
 
-//import etc.leveldb.db;
-//import etc.leveldb.options;
-//import etc.leveldb.exceptions;
-//import etc.leveldb.slice;
-
+import msgpack;
 import deimos.leveldb.leveldb;
 
 import std.stdio;
@@ -49,6 +45,9 @@ private:
   // Location in the filesystem of the database
   string db_path;
 
+  // msgpacked BucketSizes*
+  immutable string bs_path;
+
   // Have to keep a reference to all iterators to close them
   // when the DB is closed
   LevelDbImageIterator[] iterators;
@@ -76,6 +75,9 @@ public:
     }
 
     enforce(errptr is null, errptr.to!string);
+
+    bs_path = buildPath(db_path, "BUCKET_SIZES");
+
     load();
   }
 
@@ -220,6 +222,13 @@ public:
 
     if(!closed())
     {
+      if(mem_db)
+      {
+        scope bucket_sizes = mem_db.bucketSizes();
+        auto bs_packed = msgpack.pack(*bucket_sizes);
+        std.file.write(bs_path, bs_packed);
+      }
+
       foreach(LevelDbImageIterator iter; iterators)
       {
         iter.close();
@@ -245,8 +254,14 @@ public:
 private:
   void load()
   {
-    // TODO: Store coeff bucket sizes in here too
-    // it really speeds up image insertion
+    if(exists(bs_path))
+    {
+      ubyte[] bs_packed = cast(ubyte[]) std.file.read(bs_path);
+      BucketSizes sizes;
+      msgpack.unpack(bs_packed, sizes);
+
+      mem_db.bucketSizeHint(&sizes);
+    }
 
     foreach(ref img; this.imageDataIterator())
     {

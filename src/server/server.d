@@ -110,6 +110,8 @@ int main(string[] args)
     // Check that the server is still running
     if(!server_context.server_running)
     {
+      server_context.close();
+      
       writeln("Server was shutting down; notifying clients of imminent doom...");
       // Iterate through the clients and send them a shutdown signal
       foreach(client; client_connections)
