@@ -2,6 +2,7 @@ module image_db.level_db;
 
 import image_db.persisted_db;
 import image_db.mem_db;
+import sig;
 
 //import etc.leveldb.db;
 //import etc.leveldb.options;
@@ -19,8 +20,8 @@ import std.exception;
 import std.path : buildPath;
 
 // Read options for iterators and write for DB writes
-private static __gshared leveldb_readoptions_t ReadOptions;
-private static __gshared leveldb_writeoptions_t WriteOptions;
+private __gshared leveldb_readoptions_t ReadOptions;
+private __gshared leveldb_writeoptions_t WriteOptions;
 shared static this()
 {
   ReadOptions = leveldb_readoptions_create();
@@ -127,15 +128,22 @@ public:
     return true;
   }
 
-  ImageIdSigDcRes removeImage(user_id_t user_id)
+  void removeImage(user_id_t user_id, ImageIdSigDcRes* ret_img)
   {
     ImageIdSigDcRes persisted_ret;
     auto was_in_level = getImage(user_id, persisted_ret);
 
     enforce(was_in_level);
 
-    ImageIdSigDcRes mem_ret = mem_db.removeImage(user_id);
-    version(assert) assert(mem_ret.sig.sameAs(persisted_ret.sig));
+    version(assert)
+    { 
+      // Ensure that the image in the memory database is the same as the one on the
+      // disk
+      ImageIdSigDc mem_ret;
+      mem_db.removeImage(user_id, &mem_ret);
+      assert(mem_ret.sig.sameAs(persisted_ret.sig));
+      assert(mem_ret.dc == persisted_ret.dc);
+    }
 
     char* errptr = null;
     scope(exit) if(errptr) leveldb_free(errptr);
@@ -146,7 +154,15 @@ public:
     // the memdb was out of sync with the persisted db
     enforce(errptr is null, "LevelDb Error: " ~ errptr.to!string);
 
-    return persisted_ret;
+    if(ret_img != null)
+    {
+      *ret_img = persisted_ret;
+    }
+  }
+
+  void removeImage(user_id_t user_id)
+  {
+    removeImage(user_id, null);
   }
 
   uint numImages()
@@ -254,7 +270,7 @@ private:
       close();
     }
 
-    user_id_t frontId()
+    user_id_t key()
     {
       enforceIter();
       size_t keylen;
@@ -266,7 +282,7 @@ private:
       return *(cast(user_id_t*) key);
     }
 
-    ImageIdSigDcRes front()
+    ImageIdSigDcRes value()
     {
       enforceIter();
       size_t vallen;
@@ -278,6 +294,7 @@ private:
       return *(cast(ImageIdSigDcRes*) val);
     }
 
+    ImageIdSigDcRes front() { return value(); }
     bool empty()            { enforceIter(); return leveldb_iter_valid(_iter) == 0 ? true : false; }
     void popFront()         { enforceIter(); return leveldb_iter_next(_iter); }
 
@@ -371,13 +388,13 @@ unittest
 
 unittest
 {
-  auto db = getTempLevelDb();
+  scope db = getTempLevelDb();
   assert(!db.closed());
 }
 
 unittest
 {
-  auto db = getTempLevelDb();
+  scope db = getTempLevelDb();
   foreach(image; db.imageDataIterator())
   {
     assert(false);
@@ -386,7 +403,7 @@ unittest
 
 unittest
 {
-  auto db = getTempLevelDb();
+  scope db = getTempLevelDb();
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
   auto image_id = db.addImage(img_data);
@@ -395,7 +412,7 @@ unittest
 
 unittest
 {
-  auto db = getTempLevelDb();
+  scope db = getTempLevelDb();
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
   auto image_id = db.addImage(img_data);
@@ -415,7 +432,7 @@ unittest
 
 unittest
 {
-  auto db = getTempLevelDb();
+  scope db = getTempLevelDb();
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
   assert(db.numImages() == 0);

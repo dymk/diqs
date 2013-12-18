@@ -262,11 +262,9 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
     (result) {
       return ResponseQueryResults.QueryResult(
         result.image.user_id,
-        result.similarity,
-        result.image.res);
+        result.similarity);
     }
   )().array();
-  //scope(exit) { GC.free(resp_results.ptr); }
 
   timer.stop();
   auto elapsedMsec = timer.peek().msecs;

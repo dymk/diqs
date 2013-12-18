@@ -165,7 +165,7 @@ $(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 
-$(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
+$(PAYLOAD_OBJ):     $(PAYLOAD_FILES) $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
 
 $(DIQS_OBJ):        $(DIQS_FILES)

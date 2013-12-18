@@ -424,9 +424,8 @@ int main(string[] args)
           writefln("Query took %d milliseconds to perform", resp.duration);
           foreach(result; resp.results)
           {
-            writefln("ID: %8d | Sim: %2.2f | Res: %dx%d",
-              result.user_id, result.similarity,
-              result.res.width, result.res.height);
+            writefln("ID: %8d | Sim: %2.2f",
+              result.user_id, result.similarity);
           }
         }
       )();

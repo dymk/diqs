@@ -13,11 +13,7 @@ import consts :
   Weights,
   WeightsBase,
   WeightBins;
-import sig :
-	ImageSigDcRes,
-	ImageIdDcRes,
-	ImageDcRes,
-	ImageDc;
+import sig;
 import types :
   score_t,
   coeffi_t;
@@ -34,18 +30,18 @@ import core.memory : GC;
 
 struct QueryResult
 {
-	ImageIdDcRes* image;
+	const(ImageIdDc)* image;
 	float similarity;
 }
 
 struct QueryParams
 {
-	ImageSigDcRes* in_image;
+	const(ImageSigDcRes)* in_image;
 	uint num_results = 10;
 	bool ignore_color = false;
 	bool is_sketch = false;
 
-	QueryResult[] perform(T)(BucketManager bucket_manager, T[] db_images) const
+	QueryResult[] perform(T)(BucketManager bucket_manager, const T[] db_images) const
 	if(is(typeof(T.init.dc) : ImageDc))
 	{
 		immutable num_results  = min(this.num_results, db_images.length);
@@ -102,7 +98,7 @@ struct QueryParams
 
 		struct ImageScorePair
 		{
-			ImageIdDcRes* image;
+			const(ImageIdDc)* image;
 			score_t score;
 		}
 

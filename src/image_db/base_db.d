@@ -50,7 +50,7 @@ interface BaseDb
 	 * the given ID wans't found in the database to begin with,
 	 * or if removal failed for some reason.
 	 */
-	ImageIdSigDcRes removeImage(user_id_t);
+	void removeImage(user_id_t);
 
 	/**
 	 * Returns the number of images in the database.

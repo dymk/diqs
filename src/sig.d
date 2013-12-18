@@ -34,6 +34,8 @@ import std.stdio : writeln;
 import std.file : exists;
 import core.memory : GC;
 
+// TODO: Template that generates the differnet combinations of Id, Sig, Dc, Res
+
 struct CoeffIPair
 {
 	coeffi_t index;
@@ -103,6 +105,19 @@ struct ImageDcRes
 {
 	ImageDc dc;
 	ImageRes res;
+}
+
+struct ImageIdDc
+{
+	user_id_t user_id;
+	ImageDc dc;
+}
+
+struct ImageIdSigDc
+{
+	user_id_t user_id;
+	ImageSig sig;
+	ImageDc dc;
 }
 
 struct ImageIdDcRes
