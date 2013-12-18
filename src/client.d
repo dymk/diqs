@@ -382,7 +382,7 @@ int main(string[] args)
           },
           (ResponseFailure r)
           {
-            writefln("Fatal error during batch add: %d", r.code);
+            writefln("Fatal error during batch add: %d (%s)", r.code, r.code);
             keep_reading = false;
           }
         )();

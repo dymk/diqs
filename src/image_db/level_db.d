@@ -87,7 +87,7 @@ public:
     db.destroy();
   }
 
-  user_id_t addImage(in ImageIdSigDcRes img)
+  user_id_t addImage(const(ImageIdSigDcRes*) img)
   {
     auto ret = mem_db.addImage(img);
     addImageToLevel(img);
@@ -100,23 +100,39 @@ public:
    * and returns its assigned ID. The database will determine what
    * ID to give the image.
    */
-  user_id_t addImage(in ImageSigDcRes img)
+  user_id_t addImage(const(ImageSigDcRes*) img)
   {
-    auto ret = mem_db.addImage(img);
-    writeln("Added image to memdb; ret was: ", ret);
-    addImageToLevel(ImageIdSigDcRes.fromSigDcRes(img, ret));
+    auto img_id = mem_db.addImage(img);
+    auto id_img = ImageIdSigDcRes.fromSigDcRes(img_id, *img);
+    addImageToLevel(&id_img);
 
-    return ret;
+    return img_id;
   }
 
-  bool getImage(user_id_t user_id, out ImageIdSigDcRes img)
+  user_id_t addImage(user_id_t user_id, const(ImageSigDcRes*) img)
+  {
+    auto id_img = ImageIdSigDcRes.fromSigDcRes(user_id, *img);
+    return addImage(&id_img);
+  }
+
+  bool getImage(user_id_t user_id, out ImageIdSigDcRes img) const
   {
     char* errptr = null;
     scope(exit) if(errptr) leveldb_free(errptr);
 
     size_t vallen;
-    auto valptr = leveldb_get(db, ReadOptions, cast(char*) &user_id, typeid(user_id).sizeof, &vallen, &errptr);
-    scope(exit) if(valptr !is null) leveldb_free(valptr);
+    auto valptr = leveldb_get(
+      cast(void*) db, 
+      ReadOptions, 
+      cast(char*) &user_id, 
+      user_id_t.sizeof, 
+      &vallen, 
+      &errptr);
+
+    scope(exit)
+    {
+      if(valptr !is null) leveldb_free(valptr);
+    }
 
     if (valptr is null)
     {
@@ -165,17 +181,17 @@ public:
     removeImage(user_id, null);
   }
 
-  uint numImages()
+  uint numImages() const
   {
     return mem_db.numImages();
   }
 
-  user_id_t peekNextId()
+  user_id_t peekNextId() const
   {
     return mem_db.peekNextId();
   }
 
-  QueryResult[] query(QueryParams params)
+  QueryResult[] query(QueryParams params) const
   {
     return mem_db.query(params);
   }
@@ -188,16 +204,16 @@ public:
     return ret;
   }
 
-  bool released()
+  bool released() const
   {
     return mem_db is null;
   }
 
   // TODO: Make this do something more useful.
   bool flush() { return true; }
-  bool dirty() { return false;}
+  bool dirty() const { return false;}
 
-  bool closed() { return db is null; }
+  bool closed() const { return db is null; }
 
   void close()
   {
@@ -234,11 +250,11 @@ private:
 
     foreach(ref img; this.imageDataIterator())
     {
-      mem_db.addImage(img);
+      mem_db.addImage(&img);
     }
   }
 
-  void addImageToLevel(in ImageIdSigDcRes img)
+  void addImageToLevel(const(ImageIdSigDcRes*) img)
   {
     char* errptr = null;
     scope(exit) if(errptr) leveldb_free(errptr);
@@ -250,7 +266,7 @@ private:
     leveldb_put(db, WriteOptions,
       cast(char*) &(img.user_id),
       user_id_t.sizeof,
-      cast(char*) &img,
+      cast(char*) img,
       ImageIdSigDcRes.sizeof, &errptr);
 
     enforce(errptr is null, "LevelDb error: " ~ errptr.to!string);
@@ -270,7 +286,7 @@ private:
       close();
     }
 
-    user_id_t key()
+    user_id_t key() const
     {
       enforceIter();
       size_t keylen;
@@ -282,7 +298,7 @@ private:
       return *(cast(user_id_t*) key);
     }
 
-    ImageIdSigDcRes value()
+    ImageIdSigDcRes value() const
     {
       enforceIter();
       size_t vallen;
@@ -294,9 +310,9 @@ private:
       return *(cast(ImageIdSigDcRes*) val);
     }
 
-    ImageIdSigDcRes front() { return value(); }
-    bool empty()            { enforceIter(); return leveldb_iter_valid(_iter) == 0 ? true : false; }
-    void popFront()         { enforceIter(); return leveldb_iter_next(_iter); }
+    ImageIdSigDcRes front() const { return value(); }
+    bool empty()            const { enforceIter(); return leveldb_iter_valid(_iter) == 0 ? true : false; }
+    void popFront()               { enforceIter(); return leveldb_iter_next(_iter); }
 
     void close()
     out
@@ -313,7 +329,11 @@ private:
     }
 
   private:
-    void enforceIter() { enforce(_iter, "Iterator has been closed"); }
+    void enforceIter() const 
+    { 
+      enforce(_iter, "Iterator has been closed"); 
+    }
+
     leveldb_iterator_t _iter;
   }
 }
@@ -406,7 +426,7 @@ unittest
   scope db = getTempLevelDb();
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
-  auto image_id = db.addImage(img_data);
+  auto image_id = db.addImage(&img_data);
   assert(db.imageDataIterator().empty == false);
 }
 
@@ -415,7 +435,7 @@ unittest
   scope db = getTempLevelDb();
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
-  auto image_id = db.addImage(img_data);
+  auto image_id = db.addImage(&img_data);
 
   bool iterated = false;
   foreach(image; db.imageDataIterator())
@@ -436,11 +456,8 @@ unittest
   auto img_data = imageFromFile("test/cat_a1.jpg");
 
   assert(db.numImages() == 0);
-  auto image_id = db.addImage(img_data);
+  auto image_id = db.addImage(&img_data);
 
   auto memdb = db.releaseMemDb();
-
-  writeln(memdb.numImages());
-  //assert(memdb.numImages() == 1);
-  //assert(db.numImages() == 1);
+  assert(memdb.numImages() == 1);
 }

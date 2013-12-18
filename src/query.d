@@ -84,7 +84,7 @@ struct QueryParams
 			foreach(coeffi_t coeff_index; in_image.sig.sigs[chan])
 			{
 				// Grab the bucket for this (coefficient index, channel) pair
-				Bucket* bucket = bucket_manager.bucketForCoeff(coeff_index, chan);
+				auto bucket = bucket_manager.bucketForCoeff(coeff_index, chan);
 				auto weight = weights[WeightBins[abs(coeff_index)]][chan];
 
 				total_bucket_weight += weight;

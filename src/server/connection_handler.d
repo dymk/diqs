@@ -151,7 +151,7 @@ Payload handleOpeningLevelDatabase(R)(R req, Context context)
 }
 
 // Generic add image data from request and image data
-Payload addImageData(Req)(ImageSigDcRes image_data, Req req, Context context)
+Payload addImageData(Req)(const(ImageSigDcRes*) image_data, Req req, Context context)
 if(
   is(Req == RequestAddImageFromPath) ||
   is(Req == RequestAddImageFromPixels))
@@ -169,7 +169,7 @@ if(
 
   try
   {
-    bdb.addImage(ImageIdSigDcRes.fromSigDcRes(image_data, image_id));
+    bdb.addImage(image_id, image_data);
   }
   catch(BaseDb.AlreadyHaveIdException)
   {
@@ -198,7 +198,7 @@ Payload handleAddImageFromPath(RequestAddImageFromPath req, Context context)
   writefln("Processed image data (res %dx%d)",
     image_data.res.width, image_data.res.height);
 
-  return addImageData(image_data, req, context);
+  return addImageData(&image_data, req, context);
 }
 
 Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
@@ -228,7 +228,7 @@ Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
   auto image_data = ImageSigDcRes.fromWand(wand);
   image_data.res = req.original_res;
 
-  return addImageData(image_data, req, context);
+  return addImageData(&image_data, req, context);
 }
 
 Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
@@ -300,7 +300,7 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
     }
   }
 
-  auto image_entries = dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.depth);
+  auto image_entries = dirEntries(req.folder, "*.{png,jpg,jpeg,gif}", SpanMode.shallow);
 
   shared int num_added = 0;
   shared int num_failures = 0;
@@ -318,12 +318,12 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
 
   foreach(image_path; taskPool.parallel(image_entries))
   {
-    auto image_data = ImageSigDcRes.fromFile(image_path);
 
     with (ResponseFailure.Code)
     try
     {
-      user_id_t image_id = db.addImage(image_data);
+      auto image_data = ImageSigDcRes.fromFile(image_path);
+      user_id_t image_id = db.addImage(&image_data);
 
       atomicOp!"+="(num_added, 1);
       synchronized(conn)
@@ -347,6 +347,7 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
     catch(magick_wand.wand.CantExportPixelsException e) {
       batchFailure(image_path, CantExportPixels);
     }
+
   }
 
   return Payload(ResponseSuccessBatch(db_id, num_added, num_failures));

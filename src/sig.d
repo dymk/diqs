@@ -216,7 +216,7 @@ struct ImageIdSigDcRes
 	ImageDc dc;
 	ImageRes res;
 
-	static ImageIdSigDcRes fromSigDcRes(in ImageSigDcRes img, user_id_t user_id)
+	static ImageIdSigDcRes fromSigDcRes(user_id_t user_id, in ImageSigDcRes img)
 	{
 		return ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
 	}
