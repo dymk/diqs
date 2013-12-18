@@ -130,7 +130,9 @@ struct Bucket
 			if(_current_set_range.empty)
 			{
 				_current_set_num++;
-				_current_set_range = _sets[_current_set_num].opSlice();
+
+				if(!empty())
+					_current_set_range = _sets[_current_set_num].opSlice();
 			}
 		}
 
