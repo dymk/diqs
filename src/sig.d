@@ -54,9 +54,11 @@ struct ImageSig
 {
 	// Locations of the top NumSigCoeffs coefficients
 	sig_t[NumColorChans] sigs;
-	ref auto y() @property { return sigs[0]; }
-	ref auto i() @property { return sigs[1]; }
-	ref auto q() @property { return sigs[2]; }
+	auto y() @property { return forChan(0); }
+	auto i() @property { return forChan(1); }
+	auto q() @property { return forChan(2); }
+
+	auto forChan(ubyte chan) { return sigs[chan][]; }
 
 	static MagickWand resizeWand(MagickWand wand)
 	{

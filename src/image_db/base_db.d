@@ -50,27 +50,9 @@ interface BaseDb
 	user_id_t addImage(const(ImageSigDcRes*));
 
 	/**
-	 * Removes an image with a given user ID from the database, returning
-	 * the image if it was removed, or null if it failed. It may throw if
-	 * the given ID wans't found in the database to begin with,
-	 * or if removal failed for some reason.
-	 */
-	void removeImage(user_id_t);
-
-	/**
 	 * Returns the number of images in the database.
 	 */
 	uint numImages() const;
-
-	/**
-	 * Returns the next available user ID
-	 */
-	user_id_t peekNextId() const;
-
-	/**
-	 * Performs a query on the database
-	 */
-	QueryResult[] query(QueryParams) const;
 }
 
 // Guarenteed to never return the same number twice.

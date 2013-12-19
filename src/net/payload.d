@@ -77,7 +77,6 @@ enum PayloadType : ushort {
 	response_failure_batch,
 	response_server_shutdown,
 	response_image_added_batch,
-	response_unpersistable_db,
 
 	request_add_image_from_pixels,
 	request_add_image_from_path,
@@ -87,7 +86,10 @@ enum PayloadType : ushort {
 	request_list_databases,
 	request_create_level_db,
 	request_load_level_db,
+	request_export_mem_db,
+	request_create_mem_db,
 	request_remove_image,
+	request_close_db,
 	request_flush_db,
 	request_version,
 	request_ping

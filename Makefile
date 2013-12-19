@@ -58,6 +58,8 @@ SERVER_BIN = server$(EXE_EXT)
 CLIENT_BIN = client$(EXE_EXT)
 TEST_RUNNER_BIN = test_runner$(EXE_EXT)
 
+BLOOM_DIR = vendor/bloom/src
+
 DIQS_DIR   := src
 DIQS_OBJ   := diqs$(OBJ_EXT)
 DIQS_FILES := \
@@ -69,6 +71,7 @@ DIQS_FILES := \
   src/image_db/level_db.d \
   src/image_db/persisted_db.d \
   src/image_db/reservable_db.d \
+  src/image_db/queryable_db.d \
   src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \
@@ -77,7 +80,8 @@ DIQS_FILES := \
   src/reserved_array.d \
   src/sig.d \
   src/types.d \
-  src/util.d
+  src/util.d \
+  $(BLOOM_DIR)/dawg/bloom.d
 
 MAGICKWAND_OBJ   := magickwand$(OBJ_EXT)
 MAGICKWAND_FILES := $(shell ls src/magick_wand/*.d)
@@ -112,7 +116,7 @@ endif
 COMMON_OBJS = $(MAGICKWAND_OBJ) $(DIQS_OBJ) $(MSGPACK_OBJ) $(PAYLOAD_OBJ) $(LEVELDB_OBJ)
 ALL_OBJS    = $(CLIENT_OBJ) $(SERVER_OBJ) $(COMMON_OBJS)
 
-INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LEVELDB_DIR)
+INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LEVELDB_DIR) -I$(BLOOM_DIR)
 
 DC_FLAGS += $(INCLUDE_DIRS)
 

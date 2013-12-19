@@ -9,10 +9,17 @@ import image_db.all;
 
 import net.db_info;
 
-
 alias DbType = Algebraic!(
   PersistedDb,
   MemDb);
+
+BaseDb toBase(DbType db)
+{
+  return db.visit!(
+    (PersistedDb fdb) { return cast(BaseDb)fdb; },
+    (MemDb       mdb) { return cast(BaseDb)mdb; }
+  )();
+}
 
 class Context
 {
@@ -46,30 +53,21 @@ class Context
     return list;
   }
 
-  bool persistedDbIsLoaded(string path) {
-    foreach(db; databases.byValue)
-    {
-
-      bool found = db.visit!(
-        (PersistedDb fdb) { return fdb.path() == path; },
-        (MemDb       mdb) { return false; }
-      )();
-
-      if(found)
-        return true;
-    }
-
-    return false;
-  }
-
   BaseDb getDbEx(user_id_t db_id)
   {
     DbType db = *enforceEx!DbNotLoadedException(db_id in databases, "Database isn't loaded");
 
-    return db.visit!(
-      (PersistedDb fdb) { return cast(BaseDb)fdb; },
-      (MemDb       mdb) { return cast(BaseDb)mdb; }
-    )();
+    return db.toBase();
+  }
+
+  user_id_t addDb(MemDb db)
+  {
+    return addDb(DbType(db));
+  }
+
+  user_id_t addDb(PersistedDb db)
+  {
+    return addDb(DbType(db));
   }
 
   user_id_t addDb(DbType db)
@@ -84,19 +82,20 @@ class Context
     return db_id_gen.next();
   }
 
+  void destroyDb(user_id_t db_id)
+  {
+    BaseDb db = getDbEx(db_id);
+    db.destroy();
+    databases.remove(db_id);
+  }
+
   bool server_running = true;
 
   void close()
   {
     foreach(id, db; databases)
     {
-      db.tryVisit!(
-        (PersistedDb db)
-        {
-          writefln("Closing database at %s", db.path());
-          db.close();
-        }
-      )();
+      db.toBase().destroy();
     }
   }
 

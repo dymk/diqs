@@ -39,8 +39,8 @@ void handleClientRequest(Socket conn, Context context)
       handleRequestVersion,
       (RequestServerShutdown req) { return handleRequestShutdown(req, context);      },
       (RequestListDatabases req)  { return handleRequestListDatabases(req, context); },
-      (RequestLoadLevelDb req)     { return handleOpeningLevelDatabase(req, context);  },
-      (RequestCreateLevelDb req)   { return handleOpeningLevelDatabase(req, context);  },
+      (RequestLoadLevelDb req)     { return handleOpeningLevelDatabase(req, context);},
+      (RequestCreateLevelDb req)   { return handleOpeningLevelDatabase(req, context);},
       (RequestAddImageFromPath req)
                                   { return handleAddImageFromPath(req, context);     },
       (RequestAddImageFromPixels req)
@@ -48,6 +48,9 @@ void handleClientRequest(Socket conn, Context context)
       (RequestQueryFromPath req)  { return handleQueryFromPath(req, context);        },
       (RequestFlushDb req)        { return handleFlushDb(req, context);              },
       (RequestAddImageBatch req)  { return handleAddImageBatch(req, context, conn);  },
+      (RequestExportMemDb req)    { return handleExportMemDb(req, context);          },
+      (RequestCreateMemDb req)    { return handleCreateMemDb(req, context);          },
+      (RequestCloseDb req)        { return handleClosedb(req, context);              },
       ()
       {
         return Payload(ResponseFailure(ResponseFailure.Code.UnknownPayload));
@@ -137,10 +140,6 @@ Payload handleOpeningLevelDatabase(R)(R req, Context context)
   else
     static assert(false, "Request type must be LoadLevelDb or CreateLevelDb");
 
-  if(context.persistedDbIsLoaded(req.db_path))
-  {
-    return Payload(ResponseFailure(ResponseFailure.Code.DbAlreadyLoaded));
-  }
   db = new LevelDb(req.db_path, create_if_not_exist);
 
   auto db_id = context.addDb(DbType(cast(PersistedDb) db));
@@ -156,17 +155,15 @@ if(
   BaseDb bdb = context.getDbEx(req.db_id);
 
   user_id_t image_id;
-  if(req.use_image_id)
-  {
-    image_id = req.image_id;
-  } else
-  {
-    image_id = bdb.peekNextId();
-  }
-
   try
   {
-    bdb.addImage(image_id, image_data);
+    if(req.use_image_id)
+    {
+      image_id = bdb.addImage(req.image_id, image_data);
+    } else
+    {
+      image_id = bdb.addImage(image_data);
+    }
   }
   catch(BaseDb.AlreadyHaveIdException)
   {
@@ -230,7 +227,12 @@ Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
 
 Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
 {
-  BaseDb db = context.getDbEx(req.db_id);
+  QueryableDb db = cast(QueryableDb) context.getDbEx(req.db_id);
+
+  if(db is null)
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+  }
 
   QueryParams qp;
 
@@ -276,7 +278,7 @@ Payload handleFlushDb(RequestFlushDb req, Context context)
 
   if(db is null)
   {
-    return Payload(ResponseUnpersistableDb(db_id));
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
   }
 
   db.flush();
@@ -371,4 +373,34 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
   }
 
   return Payload(ResponseSuccessBatch(db_id, num_added, num_failures));
+}
+
+Payload handleClosedb(RequestCloseDb req, Context context)
+{
+  auto db_id = req.db_id;
+  context.destroyDb(db_id);
+  return Payload(ResponseSuccess());
+}
+
+Payload handleExportMemDb(RequestExportMemDb req, Context context)
+{
+  PersistedDb db = cast(PersistedDb) context.getDbEx(req.db_id);
+
+  if(db is null)
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+  }
+
+  MemDb mdb = db.exportMemDb();
+  auto id = context.addDb(mdb);
+
+  return Payload(ResponseDbInfo(id, mdb));
+}
+
+Payload handleCreateMemDb(RequestCreateMemDb req, Context context)
+{
+  MemDb db = new MemDb();
+  auto id = context.addDb(db);
+
+  return Payload(ResponseDbInfo(id, db));
 }

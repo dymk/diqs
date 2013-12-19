@@ -5,10 +5,7 @@ module image_db.bucket_manager;
  */
 
 import image_db.bucket;
-import types :
-  coeffi_t,
-  chan_t,
-  intern_id_t;
+import types;
 import sig : ImageSig;
 import consts :
   ImageArea,
@@ -22,25 +19,51 @@ import std.conv : to;
 
 // A wrapper struct for easy passing and manipulation of bucket sizes.
 struct BucketSizes
- {
-	uint[NumBuckets] sizes;
+{
 
-	uint[] Y() { return cast(uint[]) forChan(0); }
-	uint[] I() { return cast(uint[]) forChan(1); }
-	uint[] Q() { return cast(uint[]) forChan(2); }
+	inout(uint[]) y() inout { return forChan(0); }
+	inout(uint[]) i() inout { return forChan(1); }
+	inout(uint[]) q() inout { return forChan(2); }
 
 	inout(uint[]) forChan(ubyte chan) inout
 	{
 		enforce(chan < NumColorChans);
 		return sizes[(chan * NumBucketsPerChan) .. ((chan+1) * NumBucketsPerChan)];
 	}
+
+	void addSig(const(ImageSig*) sig)
+	{
+		opFromBucketSizes!"++"(sig);
+	}
+
+	void removeSig(const(ImageSig*) sig)
+	{
+		opFromBucketSizes!"--"(sig);
+	}
+
+private:
+	uint[NumBuckets] sizes;
+
+	void opFromBucketSizes(string op)(const(ImageSig*) image_sig)
+	if(op == "++" || op == "--")
+	{
+			foreach(ubyte chan, ref sig; image_sig.sigs) {
+
+					auto chan_sizes = forChan(chan);
+					foreach(coeffi_t coeff; sig)
+					{
+							ushort index = BucketManager.bucketIndexForCoeff(coeff);
+							mixin("chan_sizes[index]" ~ op ~ ";");
+					}
+			}
+	}
 }
 
 unittest
 {
 	BucketSizes bs;
-	bs.Y()[0] = 12;
-	assert(bs.Y().length == NumBucketsPerChan);
+	bs.y()[0] = 12;
+	assert(bs.y().length == NumBucketsPerChan);
 	assert(bs.sizes[0] == 12);
 }
 

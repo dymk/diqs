@@ -4,6 +4,16 @@ import sig : ImageRes;
 import types;
 import magick_wand.colorspace : RGB;
 
+struct RequestCloseDb {
+	user_id_t db_id;
+}
+
+struct RequestExportMemDb {
+	user_id_t db_id;
+}
+
+struct RequestCreateMemDb {}
+
 struct RequestCreateLevelDb {
 	string db_path;
 }

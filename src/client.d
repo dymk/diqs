@@ -202,15 +202,11 @@ int main(string[] args)
 
     writef("DBID: %d: ", db_id);
     resp.tryVisit!(
-      (ResponseUnpersistableDb r)
-      {
-        writeln("Database is not persistable! Didn't flush");
-      },
+      handleFailure,
       (ResponseSuccess r)
       {
         writeln("Success");
-      },
-      handleFailure
+      }
     )();
   }
 
@@ -431,6 +427,61 @@ int main(string[] args)
             }
           }
         )();
+      }
+
+      else if (command == "createMemDb")
+      {
+        if(cmd_parts.length != 0) {
+          writeln("createMemDb takes no arguments");
+          continue;
+        }
+        conn.writePayload(RequestCreateMemDb());
+        conn.readPayload().tryVisit!(
+          handleFailure,
+          (ResponseDbInfo resp)
+          {
+            writeln("Db created: DBID: %d", resp.db.id);
+          }
+        );
+
+      }
+
+      else if (command == "exportMemDb")
+      {
+        if(cmd_parts.length != 1) {
+          writeln("exportMemDb requires 1 argument");
+          continue;
+        }
+
+        user_id_t db_id = cmd_parts[0].to!user_id_t;
+        conn.writePayload(RequestExportMemDb(db_id));
+
+        conn.readPayload().tryVisit!(
+          handleFailure,
+          (ResponseDbInfo resp)
+          {
+            writefln("Db exported: DBID: %d", resp.db.id);
+          }
+        );
+      }
+
+      else if (command == "closeDb")
+      {
+        if(cmd_parts.length != 1) {
+          writeln("closeDb requires 1 argument");
+          continue;
+        }
+
+        user_id_t db_id = cmd_parts[0].to!user_id_t;
+        conn.writePayload(RequestCloseDb(db_id));
+
+        conn.readPayload().tryVisit!(
+          handleFailure,
+          (ResponseSuccess resp)
+          {
+            writeln("Database closed");
+          }
+        );
       }
 
       else if (command == "shutdown")
