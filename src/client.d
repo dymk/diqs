@@ -240,213 +240,219 @@ int main(string[] args)
       cmd_parts = cmd_parts[1..$];
     }
 
-    if(command == "help" || command == "") {
-      printCommands();
-    }
+    try {
 
-    else if(command == "lsDbs")
-    {
-      listRemoteDbs();
-    }
-
-    else if(command == "createLevelDb")
-    {
-      if(cmd_parts.length != 1) {
-        writeln("createLevelDb requires 1 argument");
-        continue;
+      if(command == "help" || command == "") {
+        printCommands();
       }
 
-      string db_path = cmd_parts[0];
-      genericLoadCreateLevelDb(RequestCreateLevelDb(db_path));
-    }
-
-    else if(command == "loadLevelDb")
-    {
-      if(cmd_parts.length < 1 || cmd_parts.length > 2) {
-        writeln("loadLevelDb requires 1 or 2 argument");
-        continue;
-      }
-
-      string db_path = cmd_parts[0];
-      bool create_if_not_exist = false;
-
-      if(cmd_parts.length == 2)
-        create_if_not_exist = true;
-
-      genericLoadCreateLevelDb(RequestLoadLevelDb(db_path, create_if_not_exist));
-    }
-
-    else if(command == "addImage")
-    {
-      if(cmd_parts.length < 2 || cmd_parts.length > 3) {
-        writefln("addImage requires 2 or 3 arguments");
-        continue;
-      }
-
-      string image_path;
-      user_id_t db_id;
-
-      image_path = cmd_parts[0];
-      formattedRead(cmd_parts[1], "%d", &db_id);
-
-      bool use_image_id = (cmd_parts.length == 3);
-
-      user_id_t image_id;
-      if(use_image_id) {
-        formattedRead(cmd_parts[2], "%d", &image_id);
-      }
-
-      addImage(image_path, db_id, image_id, use_image_id);
-      genericHandleImageAddResponse();
-    }
-
-    else if(command == "addImageRemote")
-    {
-      if(cmd_parts.length < 2 || cmd_parts.length > 4) {
-        writefln("addImageRemote requires 2 to 4 arguments");
-        continue;
-      }
-
-      string image_path;
-      user_id_t db_id;
-
-      image_path = cmd_parts[0];
-      formattedRead(cmd_parts[1], "%d", &db_id);
-
-      bool use_image_id = (cmd_parts.length == 4);
-
-      bool local_resize;
-      if(cmd_parts.length >= 3) {
-        // If the LOCAL_RESIZE was 1, then resize on this machine.
-        // Else, let the server take care of resizing.
-        int local_resize_val;
-        formattedRead(cmd_parts[2], "%d", &local_resize_val);
-
-        local_resize = local_resize_val == 1;
-      }
-
-      user_id_t image_id;
-      if(use_image_id) {
-        formattedRead(cmd_parts[3], "%d", &image_id);
-      }
-
-      addImageRemote(image_path, db_id, local_resize, image_id, use_image_id);
-      genericHandleImageAddResponse();
-    }
-
-    else if(command == "addImageBatch")
-    {
-      if(cmd_parts.length < 2 || cmd_parts.length > 3)
+      else if(command == "lsDbs")
       {
-        writefln("addImageBatch takes 2 or 3 arguments");
-        continue;
+        listRemoteDbs();
       }
 
-      auto folder = cmd_parts[0];
-      user_id_t db_id = to!user_id_t(cmd_parts[1]);
-
-      RequestAddImageBatch req;
-      req.folder = folder;
-      req.db_id = db_id;
-
-      if(cmd_parts.length == 3)
+      else if(command == "createLevelDb")
       {
-        req.flush_per_added = to!int(cmd_parts[2]);
-      }
-      else
-      {
-        req.flush_per_added = 500;
+        if(cmd_parts.length != 1) {
+          writeln("createLevelDb requires 1 argument");
+          continue;
+        }
+
+        string db_path = cmd_parts[0];
+        genericLoadCreateLevelDb(RequestCreateLevelDb(db_path));
       }
 
-      conn.writePayload(req);
-
-      // Keep reading batch image adds/failures until we get a success
-      // message, or a fatal error.
-      bool keep_reading = true;
-      while(keep_reading)
+      else if(command == "loadLevelDb")
       {
-        Payload resp = conn.readPayload();
-        resp.tryVisit!(
-          (ResponseImageAddedBatch r)
-          {
-            writefln("s::%s::%d::%d", r.image_path, r.db_id, r.image_id);
-          },
-          (ResponseFailureBatch r)
-          {
-            writefln("f::%s::%d", r.image_path, r.code);
-          },
-          (ResponseSuccessBatch r)
-          {
-            writefln("Done, %d images added; %d failures", r.num_images_added, r.num_failures);
-            keep_reading = false;
-          },
-          (ResponseFailure r)
-          {
-            writefln("Fatal error during batch add: %d", r.code);
-            keep_reading = false;
+        if(cmd_parts.length < 1 || cmd_parts.length > 2) {
+          writeln("loadLevelDb requires 1 or 2 argument");
+          continue;
+        }
+
+        string db_path = cmd_parts[0];
+        bool create_if_not_exist = false;
+
+        if(cmd_parts.length == 2)
+          create_if_not_exist = true;
+
+        genericLoadCreateLevelDb(RequestLoadLevelDb(db_path, create_if_not_exist));
+      }
+
+      else if(command == "addImage")
+      {
+        if(cmd_parts.length < 2 || cmd_parts.length > 3) {
+          writefln("addImage requires 2 or 3 arguments");
+          continue;
+        }
+
+        string image_path;
+        user_id_t db_id;
+
+        image_path = cmd_parts[0];
+        formattedRead(cmd_parts[1], "%d", &db_id);
+
+        bool use_image_id = (cmd_parts.length == 3);
+
+        user_id_t image_id;
+        if(use_image_id) {
+          formattedRead(cmd_parts[2], "%d", &image_id);
+        }
+
+        addImage(image_path, db_id, image_id, use_image_id);
+        genericHandleImageAddResponse();
+      }
+
+      else if(command == "addImageRemote")
+      {
+        if(cmd_parts.length < 2 || cmd_parts.length > 4) {
+          writefln("addImageRemote requires 2 to 4 arguments");
+          continue;
+        }
+
+        string image_path;
+        user_id_t db_id;
+
+        image_path = cmd_parts[0];
+        formattedRead(cmd_parts[1], "%d", &db_id);
+
+        bool use_image_id = (cmd_parts.length == 4);
+
+        bool local_resize;
+        if(cmd_parts.length >= 3) {
+          // If the LOCAL_RESIZE was 1, then resize on this machine.
+          // Else, let the server take care of resizing.
+          int local_resize_val;
+          formattedRead(cmd_parts[2], "%d", &local_resize_val);
+
+          local_resize = local_resize_val == 1;
+        }
+
+        user_id_t image_id;
+        if(use_image_id) {
+          formattedRead(cmd_parts[3], "%d", &image_id);
+        }
+
+        addImageRemote(image_path, db_id, local_resize, image_id, use_image_id);
+        genericHandleImageAddResponse();
+      }
+
+      else if(command == "addImageBatch")
+      {
+        if(cmd_parts.length < 2 || cmd_parts.length > 3)
+        {
+          writefln("addImageBatch takes 2 or 3 arguments");
+          continue;
+        }
+
+        auto folder = cmd_parts[0];
+        user_id_t db_id = to!user_id_t(cmd_parts[1]);
+
+        RequestAddImageBatch req;
+        req.folder = folder;
+        req.db_id = db_id;
+
+        if(cmd_parts.length == 3)
+        {
+          req.flush_per_added = to!int(cmd_parts[2]);
+        }
+        else
+        {
+          req.flush_per_added = 500;
+        }
+
+        conn.writePayload(req);
+
+        // Keep reading batch image adds/failures until we get a success
+        // message, or a fatal error.
+        bool keep_reading = true;
+        while(keep_reading)
+        {
+          Payload resp = conn.readPayload();
+          resp.tryVisit!(
+            (ResponseImageAddedBatch r)
+            {
+              writefln("s::%s::%d::%d", r.image_path, r.db_id, r.image_id);
+            },
+            (ResponseFailureBatch r)
+            {
+              writefln("f::%s::%d", r.image_path, r.code);
+            },
+            (ResponseSuccessBatch r)
+            {
+              writefln("Done, %d images added; %d failures", r.num_images_added, r.num_failures);
+              keep_reading = false;
+            },
+            (ResponseFailure r)
+            {
+              writefln("Fatal error during batch add: %d (%s)", r.code, r.code);
+              keep_reading = false;
+            }
+          )();
+        }
+      }
+
+      else if(command == "flushDb")
+      {
+        if(cmd_parts.length != 1)
+        {
+          writeln("flushDb takes 1 argument");
+          continue;
+        }
+
+        user_id_t db_id = to!user_id_t(cmd_parts[0]);
+        flushDatabase(db_id);
+      }
+
+      else if(command == "queryImage")
+      {
+        if(cmd_parts.length < 2 || cmd_parts.length > 3) {
+          writeln("queryImage requires 2 or 3 arguments");
+          continue;
+        }
+
+        string image_path = cmd_parts[0];
+        user_id_t db_id;
+        formattedRead(cmd_parts[1], "%d", &db_id);
+
+        uint num_results = 10;
+        if(cmd_parts.length == 3) {
+          formattedRead(cmd_parts[2], "%d", &num_results);
+        }
+
+        conn.writePayload(RequestQueryFromPath(db_id, image_path, num_results));
+        conn.readPayload().tryVisit!(
+          handleFailure,
+          (ResponseQueryResults resp) {
+            writefln("Query took %d milliseconds to perform", resp.duration);
+            foreach(result; resp.results)
+            {
+              writefln("ID: %8d | Sim: %2.2f",
+                result.user_id, result.similarity);
+            }
           }
         )();
       }
-    }
 
-    else if(command == "flushDb")
-    {
-      if(cmd_parts.length != 1)
+      else if (command == "shutdown")
       {
-        writeln("flushDb takes 1 argument");
-        continue;
-      }
-
-      user_id_t db_id = to!user_id_t(cmd_parts[0]);
-      flushDatabase(db_id);
-    }
-
-    else if(command == "queryImage")
-    {
-      if(cmd_parts.length < 2 || cmd_parts.length > 3) {
-        writeln("queryImage requires 2 or 3 arguments");
-        continue;
-      }
-
-      string image_path = cmd_parts[0];
-      user_id_t db_id;
-      formattedRead(cmd_parts[1], "%d", &db_id);
-
-      uint num_results = 10;
-      if(cmd_parts.length == 3) {
-        formattedRead(cmd_parts[2], "%d", &num_results);
-      }
-
-      conn.writePayload(RequestQueryFromPath(db_id, image_path, num_results));
-      conn.readPayload().tryVisit!(
-        handleFailure,
-        (ResponseQueryResults resp) {
-          writefln("Query took %d milliseconds to perform", resp.duration);
-          foreach(result; resp.results)
-          {
-            writefln("ID: %8d | Sim: %2.2f | Res: %dx%d",
-              result.user_id, result.similarity,
-              result.res.width, result.res.height);
+        conn.writePayload(RequestServerShutdown());
+        conn.readPayload().tryVisit!(
+          handleFailure,
+          (ResponseServerShutdown resp) {
+            writeln("Success, server shut down");
           }
-        }
-      )();
-    }
+        )();
 
-    else if (command == "shutdown")
+        return 0;
+      }
+
+      else {
+        writefln("Unknown command '%s'", command);
+      }
+    }
+    catch(net.common.ConnectionClosedException e)
     {
-      conn.writePayload(RequestServerShutdown());
-      conn.readPayload().tryVisit!(
-        handleFailure,
-        (ResponseServerShutdown resp) {
-          writeln("Success, server shut down");
-        }
-      )();
-
-      return 0;
-    }
-
-    else {
-      writefln("Unknown command '%s'", command);
+      writeln("\nServer closed the connection\n");
     }
   }
 

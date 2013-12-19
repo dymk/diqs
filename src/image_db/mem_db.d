@@ -4,20 +4,13 @@ module image_db.mem_db;
  * Represents an in memory, searchable database of images
  */
 
-import image_db.bucket_manager :
-  BucketManager,
-  BucketSizes;
-import image_db.base_db : BaseDb, IdGen;
+import image_db.bucket_manager;
+import image_db.all;
 import types :
   user_id_t,
   intern_id_t;
-import sig :
-  ImageIdSigDcRes,
-  ImageSigDcRes,
-  ImageIdDcRes,
-  ImageSig,
-  ImageRes,
-  ImageDc;
+
+import sig;
 
 import query :
   QueryResult,
@@ -28,13 +21,9 @@ import std.algorithm : min, max;
 import std.exception : enforce;
 import core.sync.mutex;
 
-version(unittest) {
-	import sig : sameAs;
-}
-
-final class MemDb : BaseDb
+final class MemDb : BaseDb, ReservableDb
 {
-	alias StoredImage = ImageIdDcRes;
+	alias StoredImage = ImageIdDc;
 
 	/// Loads the database from the file in db_path
 	this()
@@ -46,8 +35,8 @@ final class MemDb : BaseDb
 
 	this(size_t size_hint)
 	{
-		m_mem_imgs.reserve(size_hint);
 		this();
+		reserve(size_hint);
 	}
 
 	/**
@@ -73,13 +62,13 @@ final class MemDb : BaseDb
 	 * and the image isn't found in the database. Else returns null, or
 	 * a pointer to the image's data.
 	 */
-	StoredImage getImage(user_id_t id)
+	const(StoredImage)* getImage(user_id_t id)
 	{
 		auto img = has(id);
 		if(img is null) {
 			throw new BaseDb.IdNotFoundException(id);
 		}
-		return *img;
+		return img;
 	}
 
 	/**
@@ -89,11 +78,9 @@ final class MemDb : BaseDb
 	 * image with.
 	 */
 
-	user_id_t addImage(in ImageIdSigDcRes img)
+	user_id_t addImage(user_id_t user_id, const(ImageSig*) sig, const(ImageDc*) dc)
 	body
 	{
-		user_id_t user_id = img.user_id;
-
 		m_id_gen.saw(user_id);
 
 		id_mutex.lock();
@@ -107,36 +94,40 @@ final class MemDb : BaseDb
 		immutable intern_id_t intern_id = cast(intern_id_t) m_mem_imgs.length;
 
 		m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
-		m_mem_imgs[intern_id] = StoredImage(user_id, img.dc, img.res);
+		m_mem_imgs[intern_id] = StoredImage(user_id, *dc);
 
 		id_intern_map[user_id] = intern_id;
 
-		m_manager.addSig(intern_id, img.sig);
+		m_manager.addSig(intern_id, *sig);
 
 		// Arbitrary limit so the user can't have more than 4B
 		// images in the database (and they don't overflow
 		// internal IDs).
-		enforce(m_mem_imgs.length <= intern_id_t.max);
+		enforce(m_mem_imgs.length <= intern_id_t.max, "Error, can't have more than 2^32 images in one DB!");
 
 		return user_id;
 	}
 
-	user_id_t addImage(in ImageSigDcRes img)
+	user_id_t addImage(const(ImageSigDcRes*) img)
 	{
 		user_id_t user_id = m_id_gen.next();
-		return addImage(img, user_id);
+		return addImage(user_id, &(img.sig), &(img.dc));
 	}
 
-	user_id_t addImage(in ImageSigDcRes img, user_id_t user_id)
+	user_id_t addImage(user_id_t user_id, const(ImageSigDcRes*) img)
 	{
-		ImageIdSigDcRes id_img = ImageIdSigDcRes(user_id, img.sig, img.dc, img.res);
-		return addImage(id_img);
+		return addImage(user_id, &(img.sig), &(img.dc));
+	}
+
+	user_id_t addImage(const(ImageIdSigDcRes*) img)
+	{
+		return addImage(img.user_id, &(img.sig), &(img.dc));
 	}
 
 	/**
 	 * Removes an image from the database, and returns the associated signature.
 	 */
-	ImageIdSigDcRes removeImage(user_id_t user_id)
+	void removeImage(user_id_t user_id, ImageIdSigDc* ret_image)
 	{
 		id_mutex.lock();
 		scope(exit) { id_mutex.unlock(); }
@@ -152,7 +143,6 @@ final class MemDb : BaseDb
 		immutable rm_image     = m_mem_imgs[rm_intern_id];
 
 		ImageSig sig = m_manager.removeId(rm_intern_id);
-
 
 		id_intern_map.remove(user_id);
 
@@ -173,30 +163,45 @@ final class MemDb : BaseDb
 
 		m_mem_imgs.length--;
 
-		return ImageIdSigDcRes(user_id, sig, rm_image.dc, rm_image.res);
+		if(ret_image !is null)
+		{
+			*ret_image = ImageIdSigDc(user_id, sig, rm_image.dc);
+		}
 	}
 
-	uint numImages()
+	void removeImage(user_id_t user_id)
 	{
-		id_mutex.lock();
-		scope(exit) { id_mutex.unlock(); }
+		removeImage(user_id, null);
+	}
 
+	uint numImages() const
+	{
 		return cast(uint) m_mem_imgs.length;
 	}
 
-	user_id_t peekNextId()
+	user_id_t peekNextId() const
 	{
 		return m_id_gen.peek();
 	}
 
-	QueryResult[] query(QueryParams params)
+	QueryResult[] query(QueryParams params) const
 	{
-		return params.perform(m_manager, m_mem_imgs);
+		return params.perform(cast(BucketManager) m_manager, m_mem_imgs);
 	}
 
 	auto bucketSizeHint(BucketSizes* sizes)
 	{
 		return m_manager.bucketSizeHint(sizes);
+	}
+
+	auto bucketSizes()
+	{
+		return m_manager.bucketSizes();
+	}
+
+	void reserve(size_t amt)
+	{
+		m_mem_imgs.reserve(numImages() + amt);
 	}
 
 private:
@@ -238,18 +243,18 @@ unittest {
 	auto db = new MemDb();
 	assert(db.numImages() == 0);
 
-	db.addImage(img1);
+	db.addImage(&img1);
 
 	assert(db.numImages() == 1);
 }
 
 unittest {
 	auto db = new MemDb();
-	db.addImage(img1);
+	db.addImage(&img1);
 
 	bool thrown = false;
 	try {
-		db.addImage(img1);
+		db.addImage(&img1);
 	}
 	catch(BaseDb.AlreadyHaveIdException e)
 	{
@@ -260,7 +265,7 @@ unittest {
 
 unittest {
 	auto db = new MemDb();
-	db.addImage(img1);
+	db.addImage(&img1);
 
 	bool thrown = false;
 	try {
@@ -273,8 +278,10 @@ unittest {
 
 unittest {
 	auto db = new MemDb();
-	auto id = db.addImage(img1);
-	assert((db.removeImage(id)).sig.sameAs(img1.sig));
+	auto id = db.addImage(&img1);
+	ImageIdSigDc ret;
+	db.removeImage(id, &ret);
+	assert(ret.sig.sameAs(img1.sig));
 }
 
 unittest {
@@ -282,7 +289,7 @@ unittest {
 
 	assert(db.has(0) is null);
 
-	auto id = db.addImage(img1);
+	auto id = db.addImage(&img1);
 	db.removeImage(id);
 
 	assert(db.has(id) is null);
@@ -291,67 +298,61 @@ unittest {
 
 unittest {
 	auto db = new MemDb;
-	auto id = db.addImage(img1);
+	auto id = db.addImage(&img1);
 	assert(id == db.getImage(id).user_id);
 }
 
 unittest {
 	auto db = new MemDb;
-	auto id = db.addImage(img1);
+	auto id = db.addImage(&img1);
 	assert(id == db.getImage(id).user_id);
 }
 
 unittest {
 	auto db = new MemDb;
-	auto id1 = db.addImage(img1);
-	auto id2 = db.addImage(img2);
+	auto id1 = db.addImage(&img1);
+	auto id2 = db.addImage(&img2);
 
 	assert(db.numImages() == 2);
 
 	assert(db.getImage(id1).dc == img1.dc);
-	assert(db.getImage(id1).res == img1.res);
 
 	assert(db.getImage(id2).dc == img2.dc);
-	assert(db.getImage(id2).res == img2.res);
 
 	assert(db.has(id1));
 	assert(db.has(id2));
 
-	auto rm_img1 = db.removeImage(id1);
+	ImageIdSigDc rm_img1;
+	db.removeImage(id1, &rm_img1);
 	assert(db.numImages() == 1);
 
 	// Verify the right image is returned from remove
 	assert(rm_img1.sig.sameAs(img1.sig));
 	assert(rm_img1.dc == img1.dc);
-	assert(rm_img1.res == img1.res);
 
 	assert(!db.has(id1));
 	assert(db.has(id2));
 
-	auto rm_img2 = db.removeImage(id2);
+	ImageIdSigDc rm_img2;
+	db.removeImage(id2, &rm_img2);
 	assert(!db.has(id2));
 	assert(db.numImages() == 0);
 
 	assert(rm_img2.sig.sameAs(img2.sig));
 	assert(rm_img2.dc == img2.dc);
-	assert(rm_img2.res == img2.res);
-}
-
-unittest {
-	auto db = new MemDb();
-	db.addImage(img1);
-	auto rm = db.removeImage(img1.user_id);
-	assert(rm.sameAs(img1));
 }
 
 unittest {
 	assert(img1.user_id != img2.user_id);
+	assert(img1.dc != img2.dc);
+	assert(img1.res != img2.res);
+	assert(!img1.sig.sameAs(img2.sig));
 }
 
 unittest {
 	auto db = new MemDb();
-	auto id1 = db.addImage(img1);
-	auto id2 = db.addImage(img2);
+	auto id1 = db.addImage(&img1);
+	auto id2 = db.addImage(&img2);
 
 	assert(id1 == img1.user_id);
 	assert(id2 == img2.user_id);

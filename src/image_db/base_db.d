@@ -35,14 +35,19 @@ interface BaseDb
 	 * now associated with that image. If insetion fails, the function
 	 * may throw.
 	 */
-	user_id_t addImage(in ImageIdSigDcRes);
+	user_id_t addImage(const(ImageIdSigDcRes*));
+
+	/**
+	 * Convienence function for addImage(ImageIdSigDcRes)
+	 */
+ 	user_id_t addImage(user_id_t, const(ImageSigDcRes*));
 
 	/**
 	 * Inserts an image without a yet determind ID into the database
 	 * and returns its assigned ID. The database will determine what
 	 * ID to give the image.
 	 */
-	user_id_t addImage(in ImageSigDcRes);
+	user_id_t addImage(const(ImageSigDcRes*));
 
 	/**
 	 * Removes an image with a given user ID from the database, returning
@@ -50,22 +55,22 @@ interface BaseDb
 	 * the given ID wans't found in the database to begin with,
 	 * or if removal failed for some reason.
 	 */
-	ImageIdSigDcRes removeImage(user_id_t);
+	void removeImage(user_id_t);
 
 	/**
 	 * Returns the number of images in the database.
 	 */
-	uint numImages();
+	uint numImages() const;
 
 	/**
 	 * Returns the next available user ID
 	 */
-	user_id_t peekNextId();
+	user_id_t peekNextId() const;
 
 	/**
 	 * Performs a query on the database
 	 */
-	QueryResult[] query(QueryParams);
+	QueryResult[] query(QueryParams) const;
 }
 
 // Guarenteed to never return the same number twice.
@@ -79,7 +84,7 @@ final class IdGen(T)
 		return last_id++;
 	}
 
-	synchronized T peek() {
+	synchronized T peek() const {
 		return last_id;
 	}
 

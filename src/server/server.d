@@ -10,7 +10,7 @@ import net.common;
 import server.connection_handler;
 import server.context;
 
-import image_db.base_db : BaseDb, IdGen;
+import image_db.base_db;
 
 import magick_wand.wand;
 
@@ -24,9 +24,9 @@ import std.getopt : getopt;
 import std.range : array;
 import core.sync.mutex : Mutex;
 
-// Version 0.1.0
+// Version 0.2.0
 enum VersionMajor = 0;
-enum VersionMinor = 1;
+enum VersionMinor = 2;
 enum VersionPatch = 0;
 enum ServerVersion = ResponseVersion(VersionMajor, VersionMinor, VersionPatch);
 
@@ -110,6 +110,8 @@ int main(string[] args)
     // Check that the server is still running
     if(!server_context.server_running)
     {
+      server_context.close();
+
       writeln("Server was shutting down; notifying clients of imminent doom...");
       // Iterate through the clients and send them a shutdown signal
       foreach(client; client_connections)

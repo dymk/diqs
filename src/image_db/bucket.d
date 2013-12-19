@@ -17,7 +17,7 @@ import delta_queue : DeltaQueue;
 
 struct Bucket
 {
-	enum GUESS_SET_LEN =   5_000;
+	enum GUESS_SET_LEN = 500;
 	enum MAX_SET_LEN   = 500_000;
 
 	alias IdContainer = DeltaQueue!intern_id_t;
@@ -92,40 +92,54 @@ struct Bucket
 			m_id_sets.map!(a => a.length));
 	}
 
-	static struct Range
-	{
-		this(IdContainer[] sets)
-		{
-			this.sets = sets;
-			if(this.sets.length)
-			{
-				current_set = this.sets[0][];
-			}
-		}
-
-		bool empty() { return sets.length == 0 || current_set.empty; }
-		intern_id_t front() {
-			return current_set.front;
-		}
-		void popFront() {
-			current_set.popFront();
-			if(current_set.empty)
-			{
-				sets = sets[1..$];
-				if(sets.length) {
-					current_set = sets[0][];
-				}
-			}
-		}
-
-		private {
-			IdContainer[] sets;
-			IdContainer.Range current_set;
-		}
-	}
-
 	const(IdContainer[]) sets() {
 		return m_id_sets[];
+	}
+
+	static struct Range
+	{
+	private:
+		IdContainer[] _sets;
+		IdContainer.Range _current_set_range;
+		size_t _current_set_num;
+
+	public:
+		this(IdContainer[] _sets)
+		{
+			this._sets = _sets;
+			_current_set_num = 0;
+			if(_sets.length)
+			{
+				_current_set_range = _sets[0].opSlice();
+			}
+		}
+
+		bool empty() 
+		{ 
+			return _sets.length == _current_set_num; 
+		}
+
+		intern_id_t front() 
+		{
+			return _current_set_range.front();
+		}
+
+		void popFront() 
+		{
+			_current_set_range.popFront();
+			if(_current_set_range.empty)
+			{
+				_current_set_num++;
+
+				if(!empty())
+					_current_set_range = _sets[_current_set_num].opSlice();
+			}
+		}
+
+		IdContainer[] sets()
+		{
+			return _sets;
+		}
 	}
 
 private:

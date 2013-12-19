@@ -118,7 +118,6 @@ struct ResponseQueryResults {
 	struct QueryResult {
 		user_id_t user_id;
 		float similarity;
-		ImageRes res;
 	}
 
 	// How long the query took to perform

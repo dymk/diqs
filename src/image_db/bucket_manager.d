@@ -25,11 +25,11 @@ struct BucketSizes
  {
 	uint[NumBuckets] sizes;
 
-	uint[] Y() { return forChan(0); }
-	uint[] I() { return forChan(1); }
-	uint[] Q() { return forChan(2); }
+	uint[] Y() { return cast(uint[]) forChan(0); }
+	uint[] I() { return cast(uint[]) forChan(1); }
+	uint[] Q() { return cast(uint[]) forChan(2); }
 
-	uint[] forChan(ubyte chan)
+	inout(uint[]) forChan(ubyte chan) inout
 	{
 		enforce(chan < NumColorChans);
 		return sizes[(chan * NumBucketsPerChan) .. ((chan+1) * NumBucketsPerChan)];
@@ -115,7 +115,7 @@ final class BucketManager
 		return m_buckets;
 	}
 
-	auto bucketSizeHint(BucketSizes* bucket_sizes) {
+	auto bucketSizeHint(const(BucketSizes*) bucket_sizes) {
 		foreach(ubyte chan; 0..NumColorChans)
 		{
 			auto chan_sizes = bucket_sizes.forChan(chan);
@@ -125,6 +125,24 @@ final class BucketManager
 				bucket.sizeHint(bucket_size);
 			}
 		}
+	}
+
+	BucketSizes* bucketSizes()
+	{
+		BucketSizes* sizes = new BucketSizes();
+		foreach(ubyte chan; 0..NumColorChans)
+		{
+			auto chan_sizes = sizes.forChan(chan);
+			foreach(ushort index; 0..NumBucketsPerChan)
+			{
+				auto bucket = bucketForCoeff(coeffForBucketIndex(index), chan);
+				auto len = bucket.length;
+				enforce(len <= uint.max);
+				chan_sizes[index] = cast(uint) len;
+			}
+		}
+
+		return sizes;
 	}
 
 	static ushort bucketIndexForCoeff(coeffi_t coeff)

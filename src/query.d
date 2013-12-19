@@ -13,11 +13,7 @@ import consts :
   Weights,
   WeightsBase,
   WeightBins;
-import sig :
-	ImageSigDcRes,
-	ImageIdDcRes,
-	ImageDcRes,
-	ImageDc;
+import sig;
 import types :
   score_t,
   coeffi_t;
@@ -30,22 +26,23 @@ import std.math : abs;
 import std.stdio : writeln;
 import std.container : heapify;
 import std.algorithm : sort, min, max, reverse;
+import std.parallelism;
 import core.memory : GC;
 
 struct QueryResult
 {
-	ImageIdDcRes* image;
+	const(ImageIdDc)* image;
 	float similarity;
 }
 
 struct QueryParams
 {
-	ImageSigDcRes* in_image;
+	const(ImageSigDcRes)* in_image;
 	uint num_results = 10;
 	bool ignore_color = false;
 	bool is_sketch = false;
 
-	QueryResult[] perform(T)(BucketManager bucket_manager, T[] db_images) const
+	QueryResult[] perform(T)(BucketManager bucket_manager, const T[] db_images) const
 	if(is(typeof(T.init.dc) : ImageDc))
 	{
 		immutable num_results  = min(this.num_results, db_images.length);
@@ -66,7 +63,7 @@ struct QueryParams
 		auto weights = Weights[is_sketch ? 1 : 0];
 		immutable dc_weight_bin = 0;
 
-		foreach(index, ref img; db_images)
+		foreach(index, ref img; taskPool.parallel(db_images))
 		{
 			immutable ImageDc dc = img.dc;
 
@@ -88,21 +85,26 @@ struct QueryParams
 			foreach(coeffi_t coeff_index; in_image.sig.sigs[chan])
 			{
 				// Grab the bucket for this (coefficient index, channel) pair
-				Bucket* bucket = bucket_manager.bucketForCoeff(coeff_index, chan);
+				auto bucket = bucket_manager.bucketForCoeff(coeff_index, chan);
 				auto weight = weights[WeightBins[abs(coeff_index)]][chan];
 
 				total_bucket_weight += weight;
 
-				foreach(image_index; bucket.opSlice())
+				// Bucket ID sets are ~5K in size, so process them in parallel
+				// as it's guarenteed that a bucket won't have the same image ID twice.
+				foreach(bucket_set; taskPool.parallel(bucket.opSlice().sets))
 				{
-					scores[image_index] -= weight;
+					foreach(image_index; bucket_set)
+					{
+						scores[image_index] -= weight;
+					}
 				}
 			}
 		}
 
 		struct ImageScorePair
 		{
-			ImageIdDcRes* image;
+			const(ImageIdDc)* image;
 			score_t score;
 		}
 

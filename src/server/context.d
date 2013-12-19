@@ -1,11 +1,11 @@
 module server.context;
 
+import std.stdio;
 import std.variant;
 import std.path;
 import std.exception;
 
-import image_db.mem_db;
-import image_db.persisted_db;
+import image_db.all;
 
 import net.db_info;
 
@@ -85,6 +85,20 @@ class Context
   }
 
   bool server_running = true;
+
+  void close()
+  {
+    foreach(id, db; databases)
+    {
+      db.tryVisit!(
+        (PersistedDb db)
+        {
+          writefln("Closing database at %s", db.path());
+          db.close();
+        }
+      )();
+    }
+  }
 
 private:
   DbType[user_id_t] databases;

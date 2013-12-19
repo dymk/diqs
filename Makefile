@@ -63,10 +63,12 @@ DIQS_OBJ   := diqs$(OBJ_EXT)
 DIQS_FILES := \
   src/image_db/bucket.d \
   src/image_db/bucket_manager.d \
+  src/image_db/all.d \
   src/image_db/mem_db.d \
   src/image_db/base_db.d \
   src/image_db/level_db.d \
   src/image_db/persisted_db.d \
+  src/image_db/reservable_db.d \
   src/persistence_layer/file_helpers.d \
   src/consts.d \
   src/delta_queue.d \
@@ -165,7 +167,7 @@ $(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 
-$(PAYLOAD_OBJ):     $(PAYLOAD_FILES)
+$(PAYLOAD_OBJ):     $(PAYLOAD_FILES) $(DIQS_FILES)
 	$(DC) $(DC_FLAGS) $(PAYLOAD_FILES) $(INCLUDE_DIRS) -c -of$(PAYLOAD_OBJ)
 
 $(DIQS_OBJ):        $(DIQS_FILES)
