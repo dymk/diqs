@@ -27,8 +27,12 @@ in D, so if you run into issues, please let me know in the [bug tracker](https:/
 DIQS depends on ImageMagick dev package for your system, and has been tested with
 version `ImageMagick-6.8.6-Q16`.
 
+It also requires Google's LevelDb, a simple key-value store, which can be found at
+[https://code.google.com/p/leveldb/](https://code.google.com/p/leveldb/).
+It has been tested with version 0.19.0.
+
 DIQS was tested with DMD version 2.064.2, and `~master` of LDC. There's a good
-chance that it'll work just fine with GDC though, and with 2.063 of DMD. If you
+chance that it'll work just fine with GDC though, and possible 2.063 of DMD. If you
 run into compiler errors, try changing around the DC flags in the makefile;
 release and unittest tend to break the most often due to compiler changes. Chances
 are it'll compile and work just fine on Windows, but YMMV.
@@ -161,19 +165,16 @@ On failure:
 
 Todo
 ----
-  * Create only in memory databases (lower overhead than file backed DBs)
-  * Distribute file databases across multiple clients (parallelize lookup, or
-    allow clustering of slaves across several low power machines)
   * ~~MySQL/PG persistance layer adapter~~ _LevelDb backed store implemented_
-  * Loading bar for loading large databases (should be trivial)
   * ~~Network protocol for running DIQS as an actual server~~ _Basic multiclient server and client implemented_
+  * Create only in memory databases (lower overhead than file backed DBs) _Next Up_
+  * Distribute file databases across multiple clients (parallelize lookup, or
+    allow clustering of slaves across several low power machines) _Requires memory-only databases first_
+  * Loading bar for loading large databases (should be trivial)
 
-In OnDiskPersistance:
-  * Break up database into multiple files, perhaps for parallelized
-    loading from the disk?
 
 Optimizations that need to happen (more than they already have):
-  * Store bucket sizes in LevelDb.
+  * ~~Store bucket sizes in LevelDb.~~ _Done_
   * Profile database querying (mostly needs to be made multithreaded)
   * B&W Image Optimizations (less storage needed + faster query times)
 
