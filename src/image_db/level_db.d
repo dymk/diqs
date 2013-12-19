@@ -55,7 +55,7 @@ private:
   uint num_images;
 
   // Bloom filter for tracking which user_ids have already been inserted in the DB
-  scope BloomFilter!4 id_filter;
+  scope BloomFilter!(4, user_id_t) id_filter;
 
   scope shared IdGen!user_id_t id_gen;
 
