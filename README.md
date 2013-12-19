@@ -1,5 +1,8 @@
 DIQS - D Image Query Server
 ===========================
+`~master`: [![Build Status](https://travis-ci.org/dymk/diqs.png?branch=master)](https://travis-ci.org/dymk/diqs)
+
+`~develop`: [![Build Status](https://travis-ci.org/dymk/diqs.png?branch=develop)](https://travis-ci.org/dymk/diqs)
 
 > **Note**: Right now, this is alpha level software, although it seems to work
 fairly reliably right now. Expect sharp corners, a fire in the server room, and
@@ -19,7 +22,11 @@ is used for removing the image from the database, and to refer to it in query
 results. It's refered to as the 'user_id', as it is the user facing ID of the image.
 
 DIQS is my first experementation in writing medium sized, networked applications
-in D, so if you run into issues, please let me know in the [bug tracker](https://github.com/dymk/diqs/issues)!
+in D. If you run into issues, please let me know in the [bug tracker](https://github.com/dymk/diqs/issues).
+
+I've usually got some neat stuff happening in the `~develop` branch, so check that out,
+and your build will either horribly break, gain some neat new feature/optlimization, or a
+combination of both!
 
 1: Configuration
 ----------------
