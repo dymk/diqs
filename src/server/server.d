@@ -24,9 +24,9 @@ import std.getopt : getopt;
 import std.range : array;
 import core.sync.mutex : Mutex;
 
-// Version 0.1.0
+// Version 0.2.0
 enum VersionMajor = 0;
-enum VersionMinor = 1;
+enum VersionMinor = 2;
 enum VersionPatch = 0;
 enum ServerVersion = ResponseVersion(VersionMajor, VersionMinor, VersionPatch);
 
@@ -111,7 +111,7 @@ int main(string[] args)
     if(!server_context.server_running)
     {
       server_context.close();
-      
+
       writeln("Server was shutting down; notifying clients of imminent doom...");
       // Iterate through the clients and send them a shutdown signal
       foreach(client; client_connections)
