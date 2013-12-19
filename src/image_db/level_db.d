@@ -56,9 +56,6 @@ public:
 
   this(string db_path, bool create_if_missing = false)
   {
-    this.mem_db = new MemDb();
-    scope(failure) { mem_db.destroy(); }
-
     this.db_path = db_path;
 
     opts = enforce(leveldb_options_create(), "Failed to prepare DB open/create");
@@ -225,7 +222,9 @@ public:
       if(mem_db)
       {
         scope bucket_sizes = mem_db.bucketSizes();
-        auto bs_packed = msgpack.pack(*bucket_sizes);
+        uint num_images = cast(uint) mem_db.numImages();
+
+        auto bs_packed = msgpack.pack(num_images, *bucket_sizes);
         std.file.write(bs_path, bs_packed);
       }
 
@@ -263,12 +262,19 @@ public:
 private:
   void load()
   {
+    this.mem_db = new MemDb();
+
     if(exists(bs_path))
     {
       ubyte[] bs_packed = cast(ubyte[]) std.file.read(bs_path);
-      BucketSizes sizes;
-      msgpack.unpack(bs_packed, sizes);
 
+      uint num_images;
+      BucketSizes sizes;
+      msgpack.unpack(bs_packed, num_images, sizes);
+
+      writefln("Reserving space for %d images", num_images);
+
+      mem_db.reserve(num_images);
       mem_db.bucketSizeHint(&sizes);
     }
 
@@ -315,7 +321,7 @@ private:
       enforceIter();
       size_t keylen;
       auto key = leveldb_iter_key(_iter, &keylen);
-      // scope(exit) if(key) leveldb_free(key);
+      scope(failure) if(key) leveldb_free(cast(void*) key);
 
       enforce(keylen == user_id_t.sizeof);
 
@@ -327,7 +333,7 @@ private:
       enforceIter();
       size_t vallen;
       auto val = leveldb_iter_value(_iter, &vallen);
-      // scope(exit) if(val) leveldb_free(val);
+      scope(failure) if(val) leveldb_free(cast(void*) val);
 
       enforce(vallen == ImageIdSigDcRes.sizeof, "DB ret size was " ~ vallen.to!string ~ " should have been " ~ ImageIdSigDcRes.sizeof.to!string);
 
