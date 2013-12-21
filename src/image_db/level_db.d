@@ -422,10 +422,16 @@ version(unittest)
 
 unittest
 {
+  scope(exit)
+  {
+    try { rmdirRecurse("test/nonexistant"); }
+    catch(Exception e) {}
+  }
+
   bool thrown = false;
   try
   {
-    new LevelDb("nonexistant");
+    new LevelDb("test/nonexistant");
   }
   catch(PersistedDb.DbNonexistantException e)
   {
