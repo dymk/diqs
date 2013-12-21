@@ -19,11 +19,8 @@ interface PersistedDb : BaseDb
 	  { super(message, file, line, next); }
 	};
 
-	// Releases the underlying MemDb. Invalidates the database from.
-	MemDb releaseMemDb();
-
-	// Returns true if the memdb has already been released.
-	bool released();
+	// Generates a memory database from the persistance layer
+	MemDb exportMemDb();
 
 	// Flushes the data waiting to be persisted on whatever the persistence
 	// media is.

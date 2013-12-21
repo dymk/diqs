@@ -13,3 +13,6 @@
 [submodule "vendor/leveldb"]
 	path = vendor/leveldb
 	url = https://github.com/bheads/leveldb.git
+[submodule "vendor/bloom"]
+	path = vendor/bloom
+	url = https://github.com/dymk/bloom.git

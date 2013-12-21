@@ -52,6 +52,9 @@ struct ResponseFailure {
 		// The payload sent by the client isn't known (or implemented)
 		UnknownPayload,
 
+		// The operation attempted on this DB isn't supported
+		UnsupportedDbOperation,
+
 		// All else
 		UnknownException
 	}
@@ -93,9 +96,6 @@ struct ResponseSuccessBatch {
 	int num_failures;
 }
 
-struct ResponseUnpersistableDb {
-	user_id_t db_id;
-}
 
 struct ResponsePong {}
 
