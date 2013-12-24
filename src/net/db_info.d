@@ -1,14 +1,12 @@
 module net.db_info;
 
 import types;
-import image_db.base_db;
-import image_db.mem_db;
-import image_db.persisted_db;
+import image_db.all;
 
 struct DbInfo {
 	enum Type : int {
 		Mem,
-		Persisted
+		Persistable
 	}
 
 	// Probably not the best way to transfer database info, but it
@@ -21,13 +19,13 @@ struct DbInfo {
 	string _path;
 
 	bool dirty() @property {
-		enforce(type == Type.Persisted);
+		enforce(type == Type.Persistable);
 
 		return _dirty;
 	}
 
 	string path() @property {
-		enforce(type == Type.Persisted);
+		enforce(type == Type.Persistable);
 
 		return _path;
 	}
@@ -37,9 +35,9 @@ struct DbInfo {
 		this.type = Type.Mem;
 	}
 
-	this(user_id_t id, PersistedDb db) {
+	this(user_id_t id, PersistableDb db) {
 		this(id, cast(BaseDb) db);
-		this.type = Type.Persisted;
+		this.type = Type.Persistable;
 
 		this._dirty = db.dirty();
 		this._path = db.path();

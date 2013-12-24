@@ -48,7 +48,7 @@ void handleClientRequest(Socket conn, Context context)
       (RequestQueryFromPath req)  { return handleQueryFromPath(req, context);        },
       (RequestFlushDb req)        { return handleFlushDb(req, context);              },
       (RequestAddImageBatch req)  { return handleAddImageBatch(req, context, conn);  },
-      (RequestExportMemDb req)    { return handleExportMemDb(req, context);          },
+      //(RequestExportMemDb req)    { return handleExportMemDb(req, context);          },
       (RequestCreateMemDb req)    { return handleCreateMemDb(req, context);          },
       (RequestCloseDb req)        { return handleClosedb(req, context);              },
       ()
@@ -57,7 +57,7 @@ void handleClientRequest(Socket conn, Context context)
       }
     )();
   }
-  catch(PersistedDb.DbNonexistantException e) {
+  catch(PersistableDb.DbNonexistantException e) {
     response = ResponseFailure(ResponseFailure.Code.DbNonexistant);
   }
 
@@ -142,7 +142,7 @@ Payload handleOpeningLevelDatabase(R)(R req, Context context)
 
   db = new LevelDb(req.db_path, create_if_not_exist);
 
-  auto db_id = context.addDb(DbType(cast(PersistedDb) db));
+  auto db_id = context.addDb(DbType(cast(PersistableDb) db));
   return Payload(ResponseDbInfo(db_id, db));
 }
 
@@ -274,7 +274,7 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
 Payload handleFlushDb(RequestFlushDb req, Context context)
 {
   user_id_t db_id = req.db_id;
-  auto db = cast(PersistedDb) context.getDbEx(db_id);
+  auto db = cast(PersistableDb) context.getDbEx(db_id);
 
   if(db is null)
   {
@@ -289,7 +289,7 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
 {
   user_id_t db_id = req.db_id;
   auto db = context.getDbEx(db_id);
-  auto persistable_db = cast(PersistedDb) db;
+  auto persistable_db = cast(PersistableDb) db;
 
   scope(exit)
   {
@@ -382,20 +382,20 @@ Payload handleClosedb(RequestCloseDb req, Context context)
   return Payload(ResponseSuccess());
 }
 
-Payload handleExportMemDb(RequestExportMemDb req, Context context)
-{
-  PersistedDb db = cast(PersistedDb) context.getDbEx(req.db_id);
+//Payload handleExportMemDb(RequestExportMemDb req, Context context)
+//{
+//  PersistableDb db = cast(PersistableDb) context.getDbEx(req.db_id);
 
-  if(db is null)
-  {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
-  }
+//  if(db is null)
+//  {
+//    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+//  }
 
-  MemDb mdb = db.exportMemDb();
-  auto id = context.addDb(mdb);
+//  MemDb mdb = db.exportMemDb();
+//  auto id = context.addDb(mdb);
 
-  return Payload(ResponseDbInfo(id, mdb));
-}
+//  return Payload(ResponseDbInfo(id, mdb));
+//}
 
 Payload handleCreateMemDb(RequestCreateMemDb req, Context context)
 {

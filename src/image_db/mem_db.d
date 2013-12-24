@@ -21,8 +21,21 @@ import std.algorithm : min, max;
 import std.exception : enforce;
 import core.sync.mutex;
 
-final class MemDb : BaseDb, ReservableDb, QueryableDb
+final class MemDb : BaseDb, ReservableDb, QueryableDb, ImageRemovableDb
 {
+private:
+	// Maps a user_id to its index in m_mem_imgs
+	//scope immutable(StoredImage)[] m_mem_imgs;
+	scope StoredImage[] m_mem_imgs;
+
+	scope BucketManager m_manager;
+	shared IdGen!user_id_t m_id_gen;
+
+	// Mutex that must be held when doing any modifications to the
+	// id_intern_map or m_mem_imgs
+	Mutex id_mutex;
+
+public:
 	alias StoredImage = ImageIdDc;
 
 	/// Loads the database from the file in db_path
@@ -49,6 +62,8 @@ final class MemDb : BaseDb, ReservableDb, QueryableDb
 	user_id_t addImage(user_id_t user_id, const(ImageSig*) sig, const(ImageDc*) dc)
 	body
 	{
+		enforce(m_mem_imgs.length < intern_id_t.max, "Error, can't have more than 2^32 images in one DB!");
+
 		id_mutex.lock();
 		scope(exit) { id_mutex.unlock(); }
 
@@ -60,12 +75,7 @@ final class MemDb : BaseDb, ReservableDb, QueryableDb
 		m_mem_imgs.length = max(m_mem_imgs.length, intern_id+1);
 		m_mem_imgs[intern_id] = StoredImage(user_id, *dc);
 
-		m_manager.addSig(intern_id, *sig);
-
-		// Arbitrary limit so the user can't have more than 4B
-		// images in the database (and they don't overflow
-		// internal IDs).
-		enforce(m_mem_imgs.length <= intern_id_t.max, "Error, can't have more than 2^32 images in one DB!");
+		m_manager.addSig(intern_id, sig);
 
 		return user_id;
 	}
@@ -84,6 +94,56 @@ final class MemDb : BaseDb, ReservableDb, QueryableDb
 	user_id_t addImage(const(ImageIdSigDcRes*) img)
 	{
 		return addImage(img.user_id, &(img.sig), &(img.dc));
+	}
+
+	void removeImage(user_id_t user_id, ImageSig* out_sig, ImageDc* out_dc)
+	{
+		intern_id_t rm_img_intern_id = -1;
+		foreach(index, ref img; m_mem_imgs)
+		{
+			if(img.user_id == user_id)
+			{
+				rm_img_intern_id = cast(uint) index;
+				break;
+			}
+		}
+
+		if(rm_img_intern_id == -1)
+		{
+			return;
+		}
+
+		StoredImage rm_img = m_mem_imgs[rm_img_intern_id];
+		ImageSig rm_img_sig = m_manager.removeId(rm_img_intern_id);
+
+		intern_id_t last_img_intern_id = cast(intern_id_t) m_mem_imgs.length - 1;
+
+		if(rm_img_intern_id != last_img_intern_id)
+		{
+			// If the removed image isn't the last one in the set, then
+			// move the last one to replace the removed image
+
+			// Move the last signature to emplace the removed one
+			m_mem_imgs[rm_img_intern_id] = m_mem_imgs[last_img_intern_id];
+
+			// Change the last image's ID to reflect its new intern_id
+			m_manager.moveId(last_img_intern_id, rm_img_intern_id);
+		}
+
+		m_mem_imgs.length--;
+
+		if(out_sig !is null) *out_sig = rm_img_sig;
+		if(out_dc !is null)  *out_dc  = rm_img.dc;
+	}
+
+	void removeImage(user_id_t user_id)
+	{
+		removeImage(user_id, null, null);
+	}
+
+	QueryableDb getQueryable()
+	{
+		return cast(QueryableDb) this;
 	}
 
 	uint numImages() const
@@ -115,18 +175,6 @@ final class MemDb : BaseDb, ReservableDb, QueryableDb
 	{
 		m_mem_imgs.reserve(numImages() + amt);
 	}
-
-private:
-	// Maps a user_id to its index in m_mem_imgs
-	//scope immutable(StoredImage)[] m_mem_imgs;
-	scope StoredImage[] m_mem_imgs;
-
-	scope BucketManager m_manager;
-	shared IdGen!user_id_t m_id_gen;
-
-	// Mutex that must be held when doing any modifications to the
-	// id_intern_map or m_mem_imgs
-	Mutex id_mutex;
 }
 
 version(unittest)

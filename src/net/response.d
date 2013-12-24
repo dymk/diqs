@@ -2,8 +2,7 @@ module net.response;
 
 import sig;
 import types;
-import image_db.mem_db : MemDb;
-import image_db.persisted_db : PersistedDb;
+import image_db.all;
 import net.db_info : DbInfo;
 import net.common;
 
@@ -12,7 +11,7 @@ struct ResponseDbInfo {
 		this.db = DbInfo(id, _db);
 	}
 
-	this(user_id_t id, PersistedDb _db) {
+	this(user_id_t id, PersistableDb _db) {
 		this.db = DbInfo(id, _db);
 	}
 
@@ -42,7 +41,7 @@ struct ResponseFailure {
 		CantResizeImage,
 		CantExportPixels,
 
-		// PersistedDb file exceptions
+		// PersistableDb file exceptions
 		DbFileAlreadyExists,
 		DbFileNotFound,
 

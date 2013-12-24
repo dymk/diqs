@@ -73,8 +73,8 @@ int main(string[] args)
       case Mem:
         writefln("MemDb:       | ID: %5d | Images: %5d", db_info.id, db_info.num_images);
         break;
-      case Persisted:
-        writefln("PersistedDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
+      case Persistable:
+        writefln("PersistableDb: | ID: %5d | Images: %5d | Dirty? %s | Path: %s", db_info.id, db_info.num_images, db_info.dirty, db_info.path);
         break;
     }
   }

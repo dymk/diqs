@@ -78,7 +78,7 @@ final class BucketManager
 	}
 
 
-	void addSig(intern_id_t id, in ImageSig sig)
+	void addSig(intern_id_t id, const(ImageSig*) sig)
 	{
 		// populate the relevant buckets with that image's data
 		foreach(ubyte chan; 0..sig.sigs.length)
@@ -95,7 +95,7 @@ final class BucketManager
 	void moveId(const intern_id_t from, const intern_id_t to)
 	{
 		auto rm_sig = removeId(from);
-		addSig(to, rm_sig);
+		addSig(to, &rm_sig);
 	}
 
 	// Removes an ID from the bucket set, and

@@ -4,6 +4,7 @@ module image_db.base_db;
  * Represents an image database, held in memory and/or the disk.
  */
 
+import image_db.all;
 import types : user_id_t, coeffi_t;
 import sig :
   ImageIdSigDcRes,
@@ -53,6 +54,11 @@ interface BaseDb
 	 * Returns the number of images in the database.
 	 */
 	uint numImages() const;
+
+	/**
+	 * Returns a queryable database, or null
+	 */
+	QueryableDb getQueryable();
 }
 
 // Guarenteed to never return the same number twice.

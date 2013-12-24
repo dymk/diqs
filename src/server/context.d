@@ -10,13 +10,13 @@ import image_db.all;
 import net.db_info;
 
 alias DbType = Algebraic!(
-  PersistedDb,
+  PersistableDb,
   MemDb);
 
 BaseDb toBase(DbType db)
 {
   return db.visit!(
-    (PersistedDb fdb) { return cast(BaseDb)fdb; },
+    (PersistableDb fdb) { return cast(BaseDb)fdb; },
     (MemDb       mdb) { return cast(BaseDb)mdb; }
   )();
 }
@@ -45,7 +45,7 @@ class Context
 
     foreach(id, db; databases) {
       list ~= db.visit!(
-        (PersistedDb fdb) { return DbInfo(id, fdb); },
+        (PersistableDb fdb) { return DbInfo(id, fdb); },
         (MemDb  mdb) { return DbInfo(id, mdb); }
       )();
     }
@@ -65,7 +65,7 @@ class Context
     return addDb(DbType(db));
   }
 
-  user_id_t addDb(PersistedDb db)
+  user_id_t addDb(PersistableDb db)
   {
     return addDb(DbType(db));
   }
