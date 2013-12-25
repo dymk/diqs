@@ -86,7 +86,6 @@ enum PayloadType : ushort {
 	request_list_databases,
 	request_create_level_db,
 	request_load_level_db,
-	request_export_mem_db,
 	request_create_mem_db,
 	request_remove_image,
 	request_close_db,

@@ -7,15 +7,12 @@ import net.db_info : DbInfo;
 import net.common;
 
 struct ResponseDbInfo {
-	this(user_id_t id, MemDb _db) {
-		this.db = DbInfo(id, _db);
-	}
-
-	this(user_id_t id, PersistableDb _db) {
-		this.db = DbInfo(id, _db);
-	}
-
 	DbInfo db;
+
+	this(user_id_t db_id, BaseDb bdb)
+	{
+		db = DbInfo(db_id, bdb);
+	}
 }
 
 struct ResponseSuccess {}

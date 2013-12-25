@@ -47,7 +47,12 @@ SERVER_FILES = \
   src/server/context.d \
   src/server/connection_handler.d
 
-CLIENT_FILES = src/client.d
+CLIENT_FILES = \
+  src/client/client.d \
+  src/client/handlers.d \
+  src/client/help.d \
+  src/client/util.d
+
 TEST_RUNNER_FILES = src/test_runner.d
 
 SERVER_OBJ = server$(OBJ_EXT)

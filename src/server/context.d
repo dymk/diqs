@@ -44,10 +44,7 @@ class Context
     list.reserve(databases.length);
 
     foreach(id, db; databases) {
-      list ~= db.visit!(
-        (PersistableDb fdb) { return DbInfo(id, fdb); },
-        (MemDb  mdb) { return DbInfo(id, mdb); }
-      )();
+      list ~= DbInfo(id, db.toBase());
     }
 
     return list;

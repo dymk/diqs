@@ -8,10 +8,6 @@ struct RequestCloseDb {
 	user_id_t db_id;
 }
 
-struct RequestExportMemDb {
-	user_id_t db_id;
-}
-
 struct RequestCreateMemDb {}
 
 struct RequestCreateLevelDb {

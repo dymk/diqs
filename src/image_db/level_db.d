@@ -72,9 +72,13 @@ public:
 
 		this.db = leveldb_open(opts, db_path.toStringz(), &errptr);
 
-		if(errptr && errptr.to!string.canFind("nonexistant"))
+		if(errptr)
 		{
-			throw new PersistableDb.DbNonexistantException(errptr.to!string);
+			auto errptr_str = errptr.to!string();
+			if(errptr_str.canFind("nonexistant") || errptr_str.canFind("not exist"))
+			{
+				throw new PersistableDb.DbNonexistantException(errptr.to!string);
+			}
 		}
 
 		enforce(errptr is null, errptr.to!string);
@@ -222,7 +226,7 @@ public:
 		return db_path;
 	}
 
-	void openMemDb()
+	void makeQueryable()
 	out
 	{
 		assert(
@@ -252,7 +256,7 @@ public:
 		addImageChangeListener(mem_db_tracker);
 	}
 
-	void closeMemDb()
+	void destroyQueryable()
 	{
 		removeImageChangeListener(mem_db_tracker);
 		MemDb mdb = mem_db_tracker.get;
@@ -303,19 +307,39 @@ public:
 private:
 	void load()
 	{
+		bool rebuild_bucket_sizes = false;
 
 		if(exists(bs_path))
 		{
-			scope bs_packed = cast(ubyte[]) std.file.read(bs_path);
-			BucketSizes sizes;
-			msgpack.unpack(bs_packed, sizes);
-			*(bs_tracker.get) = sizes;
+			try
+			{
+				scope bs_packed = cast(ubyte[]) std.file.read(bs_path);
+				BucketSizes sizes;
+				msgpack.unpack(bs_packed, sizes);
+				*(bs_tracker.get) = sizes;
+			}
+			catch(MessagePackException e)
+			{
+				// The msgpacked file wasn't valid; recreate it
+				rebuild_bucket_sizes = true;
+
+				try
+				{
+					std.file.remove(bs_path);
+				}
+				catch(FileException e) {}
+			}
 		}
 
 		foreach(ref img; imageDataIterator())
 		{
 			id_tracker.onImageAdded(img.user_id, null, null, null);
 			num_image_counter.onImageAdded(img.user_id, null, null, null);
+
+			if(rebuild_bucket_sizes)
+			{
+				bs_tracker.onImageAdded(img.user_id, &(img.sig), null, null);
+			}
 		}
 	}
 

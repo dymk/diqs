@@ -382,21 +382,6 @@ Payload handleClosedb(RequestCloseDb req, Context context)
   return Payload(ResponseSuccess());
 }
 
-//Payload handleExportMemDb(RequestExportMemDb req, Context context)
-//{
-//  PersistableDb db = cast(PersistableDb) context.getDbEx(req.db_id);
-
-//  if(db is null)
-//  {
-//    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
-//  }
-
-//  MemDb mdb = db.exportMemDb();
-//  auto id = context.addDb(mdb);
-
-//  return Payload(ResponseDbInfo(id, mdb));
-//}
-
 Payload handleCreateMemDb(RequestCreateMemDb req, Context context)
 {
   MemDb db = new MemDb();

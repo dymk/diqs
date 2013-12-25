@@ -128,6 +128,7 @@ private:
 public:
 	this(size_t size)
 	{
+		id_gen = new IdGen!user_id_t;
 		id_filter.resize(size);
 	}
 

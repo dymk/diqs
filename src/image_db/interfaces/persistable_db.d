@@ -20,8 +20,8 @@ interface PersistableDb
 
 	// Useful for when batch image insertions need to happen
 	// Closes/opens an owned memory database
-	void closeMemDb();
-	void openMemDb();
+	void destroyQueryable();
+	void makeQueryable();
 
 	// Flushes the data waiting to be persisted on whatever the persistence
 	// media is.
