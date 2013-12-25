@@ -18,6 +18,7 @@ void printDbInfo(DbInfo db_info)
 
   if(db_info.queryable) write(" | Queryable");
   if(db_info.persistable) write(" | Persistable");
+  if(db_info.image_removable) write(" | ImageRemovable");
 
   if(db_info.persistable)
   {

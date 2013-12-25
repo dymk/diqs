@@ -80,9 +80,11 @@ enum PayloadType : ushort {
 
 	request_add_image_from_pixels,
 	request_add_image_from_path,
+	request_destroy_queryable,
 	request_add_image_batch,
 	request_server_shutdown,
 	request_query_from_path,
+	request_make_queryable,
 	request_list_databases,
 	request_create_level_db,
 	request_load_level_db,

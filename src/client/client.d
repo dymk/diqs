@@ -32,7 +32,13 @@ private
     "lsDbs": "doLsDbs",
     "loadDb": "doLoadLevelDb",
     "createDb": "doCreateDb",
-    "queryImage": "doQueryImage"
+    "queryImage": "doQueryImage",
+    "closeDb": "doCloseDb",
+    "addImage": "doAddImage",
+    "addImageBatch": "doAddImageBatch",
+    "removeImage": "doRemoveImage",
+    "makeQueryable": "doMakeQueryable",
+    "destroyQueryable": "doDestroyQueryable"
   ];
   enum command_keys = command_map.keys;
 }
@@ -109,13 +115,15 @@ int main(string[] args)
     auto str_cmd  = str_args.front;
     str_args.popFront();
 
-    dispatch(str_cmd, str_args, conn);
+    bool should_break = dispatch(str_cmd, str_args, conn);
+    if(should_break)
+      break;
   }
 
   return 0;
 }
 
-void dispatch(Range)(string str_cmd, Range str_args, Socket conn)
+bool dispatch(Range)(string str_cmd, Range str_args, Socket conn)
 if(isInputRange!Range)
 {
   Lcommandswitch:
@@ -174,8 +182,16 @@ if(isInputRange!Range)
       break Lcommandswitch;
   }
 
+  case "exit":
+    return true;
+
+  case "shutdown":
+    doShutdown(conn);
+    return true;
+
   default:
     writeln("Unknown or unsupported command");
   }
 
+  return false;
 }

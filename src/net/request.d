@@ -73,11 +73,19 @@ struct RequestAddImageBatch {
 }
 
 struct RequestRemoveImage {
-	user_id_t database_id;
+	user_id_t db_id;
 	user_id_t image_id;
 }
 
 struct RequestFlushDb {
+	user_id_t db_id;
+}
+
+struct RequestMakeQueryable {
+	user_id_t db_id;
+}
+
+struct RequestDestroyQueryable {
 	user_id_t db_id;
 }
 

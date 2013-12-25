@@ -20,7 +20,6 @@ struct ResponseSuccess {}
 struct ResponseServerShutdown {}
 
 struct ResponseImageAdded {
-	user_id_t db_id;
 	user_id_t image_id;
 }
 
@@ -42,8 +41,9 @@ struct ResponseFailure {
 		DbFileAlreadyExists,
 		DbFileNotFound,
 
-		// Signature insertion into DB errors
+		// insertion/removal DB errors
 		AlreadyHaveId,
+		IdNotFound,
 
 		// The payload sent by the client isn't known (or implemented)
 		UnknownPayload,

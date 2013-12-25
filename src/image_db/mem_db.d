@@ -35,6 +35,8 @@ private:
 	// id_intern_map or m_mem_imgs
 	Mutex id_mutex;
 
+	ubyte[user_id_t] m_user_ids;
+
 public:
 	alias StoredImage = ImageIdDc;
 
@@ -64,6 +66,11 @@ public:
 	{
 		enforce(m_mem_imgs.length < intern_id_t.max, "Error, can't have more than 2^32 images in one DB!");
 
+		if(user_id in m_user_ids)
+		{
+			throw new AlreadyHaveIdException(user_id);
+		}
+
 		id_mutex.lock();
 		scope(exit) { id_mutex.unlock(); }
 
@@ -76,6 +83,9 @@ public:
 		m_mem_imgs[intern_id] = StoredImage(user_id, *dc);
 
 		m_manager.addSig(intern_id, sig);
+
+		// mark that the user_id is in this database
+		m_user_ids[user_id] = 0;
 
 		return user_id;
 	}
@@ -110,7 +120,7 @@ public:
 
 		if(rm_img_intern_id == -1)
 		{
-			return;
+			throw new IdNotFoundException(user_id);
 		}
 
 		StoredImage rm_img = m_mem_imgs[rm_img_intern_id];
@@ -134,6 +144,8 @@ public:
 
 		if(out_sig !is null) *out_sig = rm_img_sig;
 		if(out_dc !is null)  *out_dc  = rm_img.dc;
+
+		m_user_ids.remove(user_id);
 	}
 
 	void removeImage(user_id_t user_id)

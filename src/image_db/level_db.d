@@ -159,7 +159,10 @@ public:
 		ImageIdSigDcRes persisted_ret;
 		auto was_in_level = getImage(user_id, &persisted_ret);
 
-		enforce(was_in_level);
+		if(!was_in_level)
+		{
+			throw new IdNotFoundException(user_id);
+		}
 
 		char* errptr = null;
 		scope(exit) if(errptr) leveldb_free(errptr);

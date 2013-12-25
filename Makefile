@@ -156,26 +156,26 @@ speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
 speedtest: $(TEST_RUNNER_BIN)
 
 # ==============================================================================
-$(SERVER_BIN):      $(SERVER_OBJ) $(COMMON_OBJS)
+$(SERVER_BIN):      $(SERVER_OBJ)
 	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(SERVER_BIN)
 
-$(SERVER_OBJ):      $(SERVER_FILES)
+$(SERVER_OBJ):      $(SERVER_FILES) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(CLIENT_BIN):      $(CLIENT_OBJ) $(COMMON_OBJS)
+$(CLIENT_BIN):      $(CLIENT_OBJ)
 	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
 
-$(CLIENT_OBJ):      $(CLIENT_FILES)
+$(CLIENT_OBJ):      $(CLIENT_FILES) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ) $(COMMON_OBJS)
+$(TEST_RUNNER_BIN): $(TEST_RUNNER_OBJ)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(TEST_RUNNER_BIN)
 
-$(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES)
+$(TEST_RUNNER_OBJ): $(TEST_RUNNER_FILES) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(TEST_RUNNER_FILES)  -c -of$(TEST_RUNNER_OBJ)
 # ==============================================================================
 

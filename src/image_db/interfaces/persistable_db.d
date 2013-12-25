@@ -6,7 +6,7 @@ import sig;
 import std.container : Array;
 import std.range : isInputRange;
 
-interface PersistableDb
+interface PersistableDb : BaseDb
 {
 	static class PersistableDbException : BaseDb.BaseDbException {
 	  this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null)

@@ -50,6 +50,9 @@ void handleClientRequest(Socket conn, Context context)
       (RequestAddImageBatch req)  { return handleAddImageBatch(req, context, conn);  },
       //(RequestExportMemDb req)    { return handleExportMemDb(req, context);          },
       (RequestCreateMemDb req)    { return handleCreateMemDb(req, context);          },
+      (RequestMakeQueryable req)  { return handleMakeQueryable(req, context);        },
+      (RequestDestroyQueryable req){ return handleDestroyQueryable(req, context);    },
+      (RequestRemoveImage req)    { return handleRemoveImage(req, context);          },
       (RequestCloseDb req)        { return handleClosedb(req, context);              },
       ()
       {
@@ -57,6 +60,15 @@ void handleClientRequest(Socket conn, Context context)
       }
     )();
   }
+  catch(BaseDb.IdNotFoundException e) {
+    response = ResponseFailure(ResponseFailure.Code.IdNotFound);
+  }
+
+  catch(BaseDb.AlreadyHaveIdException e)
+  {
+    response = ResponseFailure(ResponseFailure.Code.AlreadyHaveId);
+  }
+
   catch(PersistableDb.DbNonexistantException e) {
     response = ResponseFailure(ResponseFailure.Code.DbNonexistant);
   }
@@ -155,22 +167,15 @@ if(
   BaseDb bdb = context.getDbEx(req.db_id);
 
   user_id_t image_id;
-  try
+  if(req.use_image_id)
   {
-    if(req.use_image_id)
-    {
-      image_id = bdb.addImage(req.image_id, image_data);
-    } else
-    {
-      image_id = bdb.addImage(image_data);
-    }
-  }
-  catch(BaseDb.AlreadyHaveIdException)
+    image_id = bdb.addImage(req.image_id, image_data);
+  } else
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.AlreadyHaveId));
+    image_id = bdb.addImage(image_data);
   }
 
-  return Payload(ResponseImageAdded(req.db_id, image_id));
+  return Payload(ResponseImageAdded(image_id));
 }
 
 Payload handleAddImageFromPath(RequestAddImageFromPath req, Context context)
@@ -195,6 +200,7 @@ Payload handleAddImageFromPath(RequestAddImageFromPath req, Context context)
   return addImageData(&image_data, req, context);
 }
 
+// TODO: Remove this?
 Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
 {
   writefln("Got add image from pixels request: %s (use id? %s, id: %d)",
@@ -227,7 +233,7 @@ Payload handleAddImageFromPixels(RequestAddImageFromPixels req, Context context)
 
 Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
 {
-  QueryableDb db = cast(QueryableDb) context.getDbEx(req.db_id);
+  QueryableDb db = context.getDbEx(req.db_id).getQueryable();
 
   if(db is null)
   {
@@ -298,7 +304,6 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
       persistable_db.flush();
     }
   }
-
 
   shared int num_added = 0;
   shared int num_failures = 0;
@@ -388,4 +393,46 @@ Payload handleCreateMemDb(RequestCreateMemDb req, Context context)
   auto id = context.addDb(db);
 
   return Payload(ResponseDbInfo(id, db));
+}
+
+Payload handleMakeQueryable(RequestMakeQueryable req, Context context)
+{
+  BaseDb db = context.getDbEx(req.db_id);
+  PersistableDb pdb = cast(PersistableDb) db;
+
+  if(pdb is null)
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+  }
+
+  pdb.makeQueryable();
+  return Payload(ResponseSuccess());
+}
+
+Payload handleRemoveImage(RequestRemoveImage req, Context context)
+{
+  BaseDb db = context.getDbEx(req.db_id);
+  ImageRemovableDb irdb = cast(ImageRemovableDb) db;
+
+  if(irdb is null)
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+  }
+
+  irdb.removeImage(req.image_id);
+  return Payload(ResponseSuccess());
+}
+
+Payload handleDestroyQueryable(RequestDestroyQueryable req, Context context)
+{
+  BaseDb db = context.getDbEx(req.db_id);
+  PersistableDb pdb = cast(PersistableDb) db;
+
+  if(pdb is null)
+  {
+    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+  }
+
+  pdb.destroyQueryable();
+  return Payload(ResponseSuccess());
 }

@@ -161,14 +161,18 @@ int main(string[] args)
       if(listener_set.isSet(client))
       {
         // Check if the client closed their connection
+        bool did_close = false;
         try
         {
           handleClientRequest(client, server_context);
         }
-        catch(ConnectionClosedException)
+        catch(SocketOSException)            { did_close = true; }
+        catch(PayloadSocketClosedException) { did_close = true; }
+        catch(ConnectionClosedException)    { did_close = true; }
+
+        if(did_close)
         {
-          writefln("Client '%s' disconnected",
-            client.getHostname());
+          writefln("Client disconnected");
 
           // Remove the client from the list of connections
           client_connections = client_connections.remove(i);
