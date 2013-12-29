@@ -3,6 +3,7 @@ module server.connection_handler;
 import types;
 import sig;
 import query;
+import consts;
 
 import net.payload;
 import net.common;
@@ -56,41 +57,41 @@ void handleClientRequest(Socket conn, Context context)
       (RequestCloseDb req)        { return handleClosedb(req, context);              },
       ()
       {
-        return Payload(ResponseFailure(ResponseFailure.Code.UnknownPayload));
+        return Payload(ResponseFailure(ErrorCode.UnknownPayload));
       }
     )();
   }
   catch(BaseDb.IdNotFoundException e) {
-    response = ResponseFailure(ResponseFailure.Code.IdNotFound);
+    response = ResponseFailure(ErrorCode.IdNotFound);
   }
 
   catch(BaseDb.AlreadyHaveIdException e)
   {
-    response = ResponseFailure(ResponseFailure.Code.AlreadyHaveId);
+    response = ResponseFailure(ErrorCode.AlreadyHaveId);
   }
 
   catch(PersistableDb.DbNonexistantException e) {
-    response = ResponseFailure(ResponseFailure.Code.DbNonexistant);
+    response = ResponseFailure(ErrorCode.DbNonexistant);
   }
 
   catch(Context.DbNotLoadedException e) {
-    response = ResponseFailure(ResponseFailure.Code.DbNotLoaded);
+    response = ResponseFailure(ErrorCode.DbNotLoaded);
   }
 
   catch(magick_wand.wand.NonExistantFileException e) {
-    response = ResponseFailure(ResponseFailure.Code.NonExistantFile);
+    response = ResponseFailure(ErrorCode.NonExistantFile);
   }
 
   catch(magick_wand.wand.InvalidImageException e) {
-    response = ResponseFailure(ResponseFailure.Code.InvalidImage);
+    response = ResponseFailure(ErrorCode.InvalidImage);
   }
 
   catch(magick_wand.wand.CantResizeImageException e) {
-    response = ResponseFailure(ResponseFailure.Code.CantResizeImage);
+    response = ResponseFailure(ErrorCode.CantResizeImage);
   }
 
   catch(magick_wand.wand.CantExportPixelsException e) {
-    response = ResponseFailure(ResponseFailure.Code.CantExportPixels);
+    response = ResponseFailure(ErrorCode.CantExportPixels);
   }
 
   catch(PayloadSocketClosedException e) {
@@ -100,7 +101,7 @@ void handleClientRequest(Socket conn, Context context)
 
   catch(Exception e) {
     writefln("Failure; Caught exception: %s (msg: %s)", e, e.msg);
-    response = ResponseFailure(ResponseFailure.Code.UnknownException);
+    response = ResponseFailure(ErrorCode.UnknownException);
   }
 
   enforce(response.hasValue(),
@@ -237,7 +238,7 @@ Payload handleQueryFromPath(RequestQueryFromPath req, Context context)
 
   if(db is null)
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+    return Payload(ResponseFailure(ErrorCode.UnsupportedDbOperation));
   }
 
   QueryParams qp;
@@ -284,7 +285,7 @@ Payload handleFlushDb(RequestFlushDb req, Context context)
 
   if(db is null)
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+    return Payload(ResponseFailure(ErrorCode.UnsupportedDbOperation));
   }
 
   db.flush();
@@ -309,7 +310,7 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
   shared int num_failures = 0;
   immutable flush_per_added = req.flush_per_added;
 
-  void batchFailure(string image_path, ResponseFailure.Code err_code)
+  void batchFailure(string image_path, ErrorCode err_code)
   {
     synchronized(conn)
     {
@@ -346,7 +347,7 @@ Payload handleAddImageBatch(RequestAddImageBatch req, Context context, Socket co
   foreach(image_path; taskPool.parallel(imageFiles()))
   {
 
-    with (ResponseFailure.Code)
+    with (ErrorCode)
     try
     {
       auto image_data = ImageSigDcRes.fromFile(image_path);
@@ -402,7 +403,7 @@ Payload handleMakeQueryable(RequestMakeQueryable req, Context context)
 
   if(pdb is null)
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+    return Payload(ResponseFailure(ErrorCode.UnsupportedDbOperation));
   }
 
   pdb.makeQueryable();
@@ -416,7 +417,7 @@ Payload handleRemoveImage(RequestRemoveImage req, Context context)
 
   if(irdb is null)
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+    return Payload(ResponseFailure(ErrorCode.UnsupportedDbOperation));
   }
 
   irdb.removeImage(req.image_id);
@@ -430,7 +431,7 @@ Payload handleDestroyQueryable(RequestDestroyQueryable req, Context context)
 
   if(pdb is null)
   {
-    return Payload(ResponseFailure(ResponseFailure.Code.UnsupportedDbOperation));
+    return Payload(ResponseFailure(ErrorCode.UnsupportedDbOperation));
   }
 
   pdb.destroyQueryable();

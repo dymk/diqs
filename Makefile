@@ -48,10 +48,18 @@ SERVER_FILES = \
   src/server/connection_handler.d
 
 CLIENT_FILES = \
-  src/client/client.d \
+  src/client/client.d
+
+COMMAND_TARGETS = \
+	command/load_db$(EXE_EXT)
+
+CLIENT_COMMON_FILES = \
   src/client/handlers.d \
   src/client/help.d \
-  src/client/util.d
+  src/client/util.d \
+  src/client/commands/common.d
+
+CLIENT_COMMON_OBJ = client_common$(OBJ_EXT)
 
 TEST_RUNNER_FILES = src/test_runner.d
 
@@ -128,7 +136,7 @@ INCLUDE_DIRS = -I$(MSGPACK_DIR) -I$(DIQS_DIR) -I$(LEVELDB_DIR) -I$(BLOOM_DIR)
 
 DC_FLAGS += $(INCLUDE_DIRS)
 
-ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN)
+ALL_BIN = $(SERVER_BIN) $(CLIENT_BIN) command_targets
 
 .PHONY: all
 all: debug
@@ -156,19 +164,32 @@ speedtest: DC_FLAGS += $(SPEEDTEST_FLAGS)
 speedtest: $(TEST_RUNNER_BIN)
 
 # ==============================================================================
-$(SERVER_BIN):      $(SERVER_OBJ)
+$(SERVER_BIN):      $(SERVER_OBJ) $(COMMON_OBJS)
 	$(DC) $(DC_FLAGS) $(SERVER_OBJ) $(COMMON_OBJS) $(LIBS) -of$(SERVER_BIN)
 
-$(SERVER_OBJ):      $(SERVER_FILES) $(COMMON_OBJS)
+$(SERVER_OBJ):      $(SERVER_FILES)
 	$(DC) $(DC_FLAGS) $(SERVER_FILES)  -c -of$(SERVER_OBJ)
 # ==============================================================================
 
 # ==============================================================================
-$(CLIENT_BIN):      $(CLIENT_OBJ)
-	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
+$(CLIENT_BIN):      $(CLIENT_OBJ) $(COMMON_OBJS) $(CLIENT_COMMON_OBJ)
+	$(DC) $(DC_FLAGS) $(CLIENT_OBJ) $(CLIENT_COMMON_OBJ) $(COMMON_OBJS) $(LIBS) -of$(CLIENT_BIN)
 
-$(CLIENT_OBJ):      $(CLIENT_FILES) $(COMMON_OBJS)
+$(CLIENT_OBJ):      $(CLIENT_FILES)
 	$(DC) $(DC_FLAGS) $(CLIENT_FILES)  -c -of$(CLIENT_OBJ)
+# ==============================================================================
+
+# ==============================================================================
+command/%$(EXE_EXT): src/client/commands/%.d $(CLIENT_COMMON_OBJ) $(COMMON_OBJS)
+	mkdir -p command
+	$(DC) $(DC_FLAGS) $< $(CLIENT_COMMON_OBJ) $(COMMON_OBJS) $(LIBS) -of$@
+
+.PHONY: command_targets
+command_targets: $(COMMAND_TARGETS)
+
+$(CLIENT_COMMON_OBJ): $(CLIENT_COMMON_FILES)
+	$(DC) $(DC_FLAGS) $(CLIENT_COMMON_FILES) -c -of$(CLIENT_COMMON_OBJ)
+
 # ==============================================================================
 
 # ==============================================================================
@@ -201,4 +222,6 @@ clean:
 	rm -f $(CLIENT_BIN)
 	rm -rf bin/*.*
 	rm -f $(ALL_OBJS)
+	rm -f *.o
+	rm -f *.obj
 	rm -rf *.exe

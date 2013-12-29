@@ -4,9 +4,10 @@ import client.util;
 import client.help;
 import client.handlers;
 
+import consts;
 import types;
-import magick_wand.wand;
 import sig;
+import magick_wand.wand;
 import net.payload;
 import net.common;
 import net.db_info;
@@ -60,7 +61,7 @@ int main(string[] args)
 
 	try
 	{
-		getopt(args, "help|h", &help, "host|h", &host, "port|p", &port);
+		getopt(args, "help|h", &help, "host|H", &host, "port|P", &port);
 	}
 	catch(Exception e)
 	{
@@ -80,9 +81,7 @@ int main(string[] args)
 	Socket conn;
 	try
 	{
-		conn = new TcpSocket(AddressFamily.INET);
-		conn.blocking = true;
-		conn.connect(new InternetAddress(host, port));
+		conn = connectToServer(host, port);
 	}
 	catch(SocketOSException e)
 	{

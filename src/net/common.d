@@ -7,9 +7,6 @@ import std.string : format;
 import std.socket : Socket;
 import core.memory : GC;
 
-static immutable DefaultHost = "127.0.0.1";
-            enum DefaultPort = 9548;
-
 class NetworkException : Exception
 {
   this(string message, string file = __FILE__, size_t line = __LINE__, Throwable next = null) { super(message, file, line, next); }

@@ -1,9 +1,6 @@
 module client.help;
 
-import client.client;
-
-import net.common;
-import std.stdio;
+import client.commands.common;
 
 void printCommands() {
   writeln(`

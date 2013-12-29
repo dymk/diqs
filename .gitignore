@@ -22,6 +22,7 @@ Unittest/*
 test/ignore/*
 test/*.db
 
+/command/*
 /server
 /server.exe
 /client

@@ -79,3 +79,42 @@ shared ubyte[ImageArea] WeightBins = (() {
 	return tmp;
 })();
 
+enum DefaultHost = "127.0.0.1";
+enum DefaultPort = 9548;
+
+enum ErrorCode : ubyte
+{
+	// Loaded database errors
+	DbAlreadyLoaded,
+	DbNotLoaded,
+	DbNonexistant,
+
+	// Image signature generation errors
+	NonExistantFile,
+	InvalidImage,
+	CantResizeImage,
+	CantExportPixels,
+
+	// PersistableDb file exceptions
+	DbFileAlreadyExists,
+	DbFileNotFound,
+
+	// insertion/removal DB errors
+	AlreadyHaveId,
+	IdNotFound,
+
+	// The payload sent by the client isn't known (or implemented)
+	UnknownPayload,
+
+	// The operation attempted on this DB isn't supported
+	UnsupportedDbOperation,
+
+	// Error connecting to server
+	ConnectionError,
+
+	// Invalid command line options
+	InvalidOptions,
+
+	// All else
+	UnknownException
+}

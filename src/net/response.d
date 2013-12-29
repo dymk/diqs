@@ -2,6 +2,7 @@ module net.response;
 
 import sig;
 import types;
+import consts;
 import image_db.all;
 import net.db_info : DbInfo;
 import net.common;
@@ -24,38 +25,7 @@ struct ResponseImageAdded {
 }
 
 struct ResponseFailure {
-	enum Code : ubyte {
-
-		// Loaded database errors
-		DbAlreadyLoaded,
-		DbNotLoaded,
-		DbNonexistant,
-
-		// Image signature generation errors
-		NonExistantFile,
-		InvalidImage,
-		CantResizeImage,
-		CantExportPixels,
-
-		// PersistableDb file exceptions
-		DbFileAlreadyExists,
-		DbFileNotFound,
-
-		// insertion/removal DB errors
-		AlreadyHaveId,
-		IdNotFound,
-
-		// The payload sent by the client isn't known (or implemented)
-		UnknownPayload,
-
-		// The operation attempted on this DB isn't supported
-		UnsupportedDbOperation,
-
-		// All else
-		UnknownException
-	}
-
-	Code code;
+	ErrorCode code;
 }
 
 struct ResponseImageAddedBatch {
@@ -75,7 +45,7 @@ struct ResponseFailureBatch {
 
 	user_id_t db_id;
 	string image_path;
-	ResponseFailure.Code code;
+	ErrorCode code;
 }
 
 struct ResponseSuccessBatch {

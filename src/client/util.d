@@ -3,6 +3,7 @@ module client.util;
 import net.db_info;
 
 import std.stdio;
+import std.socket;
 
 void printDbInfo(DbInfo db_info)
 {
@@ -26,4 +27,12 @@ void printDbInfo(DbInfo db_info)
   }
 
   writeln();
+}
+
+Socket connectToServer(string host, ushort port)
+{
+  Socket conn = new TcpSocket(AddressFamily.INET);
+  conn.blocking = true;
+  conn.connect(new InternetAddress(host, port));
+  return conn;
 }
