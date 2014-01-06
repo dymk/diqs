@@ -20,6 +20,11 @@ void printFailure(ErrorCode code, string err_str = "f")
 	writefln("%s::%d::%s", err_str, code, code);
 }
 
+void commonHandleResponseFailure(ResponseFailure f)
+{
+	printFailure(f.code);
+}
+
 void printDbInfo(DbInfo info)
 {
 	writefln("s::%d::%d::%d::%d",

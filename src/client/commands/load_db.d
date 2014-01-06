@@ -24,7 +24,7 @@ int main(string[] args)
 		return ErrorCode.InvalidOptions;
 	}
 
-	if(path == "")
+	if(help || path == "")
 	{
 		printHelp();
 		return 0;
@@ -41,13 +41,10 @@ int main(string[] args)
 
 	conn.writePayload(RequestLoadLevelDb(path, create));
 	conn.readPayload().tryVisit!(
+		commonHandleResponseFailure,
 		(ResponseDbInfo resp)
 		{
 			printDbInfo(resp.db);
-		},
-		(ResponseFailure resp)
-		{
-			printFailure(resp.code);
 		}
 	);
 

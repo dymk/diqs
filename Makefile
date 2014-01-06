@@ -51,7 +51,9 @@ CLIENT_FILES = \
   src/client/client.d
 
 COMMAND_TARGETS = \
-	command/load_db$(EXE_EXT)
+	command/load_db$(EXE_EXT) \
+	command/create_db$(EXE_EXT) \
+	command/query_image$(EXE_EXT)
 
 CLIENT_COMMON_FILES = \
   src/client/handlers.d \
