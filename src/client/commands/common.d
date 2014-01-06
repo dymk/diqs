@@ -10,6 +10,8 @@ public {
 	import std.stdio;
 	import std.variant : tryVisit;
 	import std.socket;
+	import std.array;
+	import std.conv : to;
 	import std.getopt : getopt;
 }
 
@@ -24,10 +26,12 @@ void printDbInfo(DbInfo info)
 		info.id, info.flags, info.type, info.num_images);
 }
 
-mixin template FatalError(ErrorCode e)
+template FatalError(ErrorCode e)
 {
-	printFailure(e);
-	return e;
+	enum FatalError = q{
+		printFailure(e);
+		return e;
+	}.replace("__e", e.to!string);
 }
 
 int connectToServerCommon(ref string[] args, out string host, out ushort port, out Socket conn)
@@ -56,4 +60,14 @@ int connectToServerCommon(ref string[] args, out string host, out ushort port, o
 	}
 
 	return 0;
+}
+
+void printCommonHelp()
+{
+	writeln(`
+    --host=HOST | -HHOST = 127.0.0.1
+      Connect to the DIQS server at HOST
+
+    --port=PORT | -PPORT = 9548
+      Connect to the server on port PORT`);
 }
