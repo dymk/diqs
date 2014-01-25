@@ -18,12 +18,18 @@ final class ConnectionClosedException : NetworkException
 };
 
 bool writeValue(Value)(Socket conn, Value value) {
+  import std.stdio;
+  writefln("Writing %s value to client (%d bytes long)", Value.stringof, Value.sizeof);
+
 	ubyte[Value.sizeof] val;
 	val = *(cast(ubyte[Value.sizeof]*)(&value));
 	return conn.send(val[]) == Value.sizeof;
 }
 
 Value readValue(Value)(Socket conn) {
+  import std.stdio;
+  writefln("Reading %s value from client (%d bytes long)", Value.stringof, Value.sizeof);
+
 	ubyte[Value.sizeof] ret_arr;
   auto len_recieved = conn.receive(ret_arr[]);
 
@@ -34,5 +40,9 @@ Value readValue(Value)(Socket conn) {
 
 	enforce(len_recieved == Value.sizeof,
     "Didn't recieve right length (got " ~ to!string(len_recieved) ~ " expected " ~ to!string(Value.sizeof));
-	return *(cast(Value*)ret_arr.ptr);
+	auto ret = *(cast(Value*)ret_arr.ptr);
+
+  writeln("Returning ret: ", ret);
+
+  return ret;
 }

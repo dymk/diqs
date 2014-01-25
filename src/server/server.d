@@ -170,6 +170,7 @@ int main(string[] args)
         catch(SocketOSException)            { did_close = true; }
         catch(PayloadSocketClosedException) { did_close = true; }
         catch(ConnectionClosedException)    { did_close = true; }
+        catch(Exception e) {} // Try and keep sockets open as much as possible
 
         if(did_close)
         {
